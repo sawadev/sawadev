@@ -131,10 +131,17 @@ function DTerm() {
   );
 }
 
-export function DesktopIDE({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
-  return (
-    <WinChrome url="storefront-api.sawadev.io/edit">
-      <div style={{ height: '100%', display: 'flex', background: 'var(--bg)' }}>
+export function DesktopIDE({
+  theme,
+  onToggleTheme,
+  framed = false,
+}: {
+  theme: Theme;
+  onToggleTheme: () => void;
+  framed?: boolean;
+}) {
+  const content = (
+    <div style={{ height: '100%', display: 'flex', background: 'var(--bg)' }}>
         <DeskRail theme={theme} onToggleTheme={onToggleTheme} />
         {/* file tree */}
         <div style={{ width: 234, flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--surface-2)', display: 'flex', flexDirection: 'column' }}>
@@ -251,6 +258,10 @@ export function DesktopIDE({ theme, onToggleTheme }: { theme: Theme; onToggleThe
           </div>
         </div>
       </div>
-    </WinChrome>
   );
+
+  if (framed) {
+    return <WinChrome url="storefront-api.sawadev.io/edit">{content}</WinChrome>;
+  }
+  return <div style={{ width: '100%', height: '100%', overflow: 'auto', background: 'var(--bg)' }}>{content}</div>;
 }

@@ -7,6 +7,11 @@ import { MobileApp } from './mobile/MobileApp';
 import { DesktopIDE } from './desktop/DesktopIDE';
 import { IOSDevice } from './device/IOSDevice';
 
+/** Below this width we treat the device as a phone/tablet. */
+const MOBILE_QUERY = '(max-width: 820px)';
+
+type DevicePref = 'auto' | Device;
+
 function usePersisted<T extends string>(key: string, fallback: T): [T, (v: T) => void] {
   const [val, setVal] = useState<T>(() => (localStorage.getItem(key) as T) || fallback);
   useEffect(() => {
@@ -15,6 +20,19 @@ function usePersisted<T extends string>(key: string, fallback: T): [T, (v: T) =>
   return [val, setVal];
 }
 
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const m = window.matchMedia(query);
+    const handler = () => setMatches(m.matches);
+    m.addEventListener('change', handler);
+    setMatches(m.matches);
+    return () => m.removeEventListener('change', handler);
+  }, [query]);
+  return matches;
+}
+
+/** Scale a fixed-size artboard to fit the viewport (used for the phone preview). */
 function useViewportScale(w: number, h: number, pad: number) {
   const [scale, setScale] = useState(1);
   useLayoutEffect(() => {
@@ -29,29 +47,45 @@ function useViewportScale(w: number, h: number, pad: number) {
   return scale;
 }
 
-function DeviceSwitch({ device, onChange }: { device: Device; onChange: (d: Device) => void }) {
+/** Centered, scaled iPhone preview — only used when forcing mobile on a wide screen. */
+function PhonePreview({
+  theme,
+  toggleTheme,
+  accent,
+  setAccent,
+}: {
+  theme: Theme;
+  toggleTheme: () => void;
+  accent: string;
+  setAccent: (hex: string) => void;
+}) {
+  const W = 402;
+  const H = 874;
+  const scale = useViewportScale(W, H, 80);
   return (
-    <div className="devsw">
-      <div className="seg" style={{ boxShadow: 'var(--shadow-md)' }}>
-        <button className={device === 'mobile' ? 'on' : ''} onClick={() => onChange('mobile')}>
-          <HIcon name="cpu" size={14} color="currentColor" />
-          Mobile
-        </button>
-        <button className={device === 'desktop' ? 'on' : ''} onClick={() => onChange('desktop')}>
-          <HIcon name="dock" size={14} color="currentColor" />
-          Desktop
-        </button>
+    <div className={'stage ' + theme} style={{ position: 'fixed', inset: 0 }}>
+      <div style={{ width: W * scale, height: H * scale, position: 'relative' }}>
+        <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+          <IOSDevice width={W} height={H} dark={theme === 'dark'}>
+            <MobileApp theme={theme} onToggleTheme={toggleTheme} accent={accent} onAccent={setAccent} />
+          </IOSDevice>
+        </div>
       </div>
     </div>
   );
 }
 
-function Controls({
+/** Dev-only floating bar: force device, toggle theme, pick accent. Hidden in production. */
+function DevBar({
+  pref,
+  setPref,
   theme,
   onToggleTheme,
   accent,
   onAccent,
 }: {
+  pref: DevicePref;
+  setPref: (p: DevicePref) => void;
   theme: Theme;
   onToggleTheme: () => void;
   accent: string;
@@ -63,7 +97,7 @@ function Controls({
         position: 'fixed',
         bottom: 16,
         right: 16,
-        zIndex: 30,
+        zIndex: 1000,
         display: 'flex',
         alignItems: 'center',
         gap: 10,
@@ -74,6 +108,14 @@ function Controls({
         boxShadow: 'var(--shadow-md)',
       }}
     >
+      <div className="seg">
+        {(['auto', 'mobile', 'desktop'] as DevicePref[]).map((p) => (
+          <button key={p} className={pref === p ? 'on' : ''} onClick={() => setPref(p)} style={{ textTransform: 'capitalize' }}>
+            {p}
+          </button>
+        ))}
+      </div>
+      <div style={{ width: 1, height: 22, background: 'var(--border)' }} />
       <button onClick={onToggleTheme} className="btn btn-soft btn-icon btn-sm" title="Toggle theme">
         <HIcon name={theme === 'dark' ? 'sun' : 'moon'} size={16} color="var(--text-2)" />
       </button>
@@ -103,32 +145,36 @@ function Controls({
 export function App() {
   const [theme, setTheme] = usePersisted<Theme>('sawa.theme', 'dark');
   const [accent, setAccent] = usePersisted<string>('sawa.accent', '#7C5CF6');
-  const [device, setDevice] = usePersisted<Device>('sawa.device', 'mobile');
+  const [pref, setPref] = usePersisted<DevicePref>('sawa.device', 'auto');
+
+  const narrow = useMediaQuery(MOBILE_QUERY);
+  const auto: Device = narrow ? 'mobile' : 'desktop';
+  const device: Device = pref === 'auto' ? auto : pref;
+  const isMobile = device === 'mobile';
+  // Frame the phone preview only when mobile is *forced* on a wide screen.
+  const framedMobile = isMobile && !narrow;
 
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
-  const isMobile = device === 'mobile';
-  const W = isMobile ? 402 : 1440;
-  const H = isMobile ? 874 : 900;
-  const scale = useViewportScale(W, H, isMobile ? 80 : 96);
 
   return (
     <div className="sawa" data-theme={theme} style={{ ['--accent' as keyof CSSProperties]: accent } as CSSProperties}>
-      <div className={'stage ' + theme}>
-        <div style={{ width: W * scale, height: H * scale, position: 'relative' }}>
-          <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
-            {isMobile ? (
-              <IOSDevice width={402} height={874} dark={theme === 'dark'}>
-                <MobileApp theme={theme} onToggleTheme={toggleTheme} accent={accent} onAccent={setAccent} />
-              </IOSDevice>
-            ) : (
-              <DesktopIDE theme={theme} onToggleTheme={toggleTheme} />
-            )}
+      {isMobile ? (
+        framedMobile ? (
+          <PhonePreview theme={theme} toggleTheme={toggleTheme} accent={accent} setAccent={setAccent} />
+        ) : (
+          <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)' }}>
+            <MobileApp theme={theme} onToggleTheme={toggleTheme} accent={accent} onAccent={setAccent} />
           </div>
+        )
+      ) : (
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)' }}>
+          <DesktopIDE theme={theme} onToggleTheme={toggleTheme} />
         </div>
-      </div>
+      )}
 
-      <DeviceSwitch device={device} onChange={setDevice} />
-      <Controls theme={theme} onToggleTheme={toggleTheme} accent={accent} onAccent={setAccent} />
+      {import.meta.env.DEV && (
+        <DevBar pref={pref} setPref={setPref} theme={theme} onToggleTheme={toggleTheme} accent={accent} onAccent={setAccent} />
+      )}
     </div>
   );
 }
