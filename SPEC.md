@@ -190,6 +190,27 @@ docker compose up -d
 
 ---
 
+## 5 quinquies. Mises à jour
+
+**MVP : one-click depuis l'UI + notification** quand une nouvelle version est disponible. (Auto-update programmée prévue _plus tard_.)
+
+**Mécanisme — conteneur « updater » éphémère :**
+- Un conteneur ne peut pas se recréer lui-même proprement. L'orchestrateur ne se met donc **pas** à jour directement : au clic, il **lance un conteneur updater jetable** (via le socket Docker) qui exécute `docker compose pull && docker compose up -d`. L'updater étant un processus séparé, il survit au redémarrage de l'orchestrateur.
+- **Les workspaces ne font PAS partie du `docker compose`** (conteneurs frères créés à la volée) → une mise à jour de l'app ne recrée que `caddy` + `orchestrateur` et **n'interrompt jamais les projets de l'utilisateur**.
+
+**Sécurité :**
+- **Health check après MAJ + rollback automatique** vers l'image précédente si le nouvel orchestrateur ne répond pas. Versions épinglées par **digest** pour un rollback fiable.
+- **Migrations** de données appliquées au démarrage du nouvel orchestrateur.
+- **Canaux** : `stable` (défaut) / `beta`, **tags semver** (`v0.2.1`) plutôt que `latest`.
+
+**Distribution :** images sur **GHCR (GitHub Container Registry)** — gratuit, déjà sur GitHub, **aucune dépendance tierce ajoutée**. Vérification de MAJ = tags GHCR ou manifeste dans les GitHub Releases.
+
+**CLI complémentaire :** `sawadev update`, `sawadev rollback`, `sawadev version`.
+
+> **Watchtower** écarté volontairement (dépendance en plus, moins de contrôle sur health-check/rollback et sur la préservation des workspaces). Mécanisme construit nativement.
+
+---
+
 ## 6. Positionnement (produits comparables)
 
 Coder, Gitpod, GitHub Codespaces, code-server / openvscode-server, Eclipse Che, DevPod.
@@ -218,12 +239,14 @@ Coder, Gitpod, GitHub Codespaces, code-server / openvscode-server, Eclipse Che, 
 - **UI de chat** enveloppant un agent CLI.
 - Gestion des **clés API**.
 - **Multi-workspaces**, démarrage / arrêt manuel.
+- **Mises à jour one-click + notification** (conteneur updater, health-check + rollback).
 
 ### Plus tard
 - Support **`devcontainer.json`**.
 - **Repli HTTP-01** + **multi-provider DNS**.
 - **Arrêt auto après inactivité** (par projet).
 - **Proxy de socket Docker** (durcissement).
+- **Auto-update programmée** (canal `stable`).
 
 ---
 

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>sawadev · wireframes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Caveat:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; }
+  * { box-sizing: border-box; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="wireframe-kit.jsx"></script>
+<script type="text/babel" src="screens-auth.jsx"></script>
+<script type="text/babel" src="screens-workspaces.jsx"></script>
+<script type="text/babel" src="screens-ide-mobile.jsx"></script>
+<script type="text/babel" src="screens-ide-desktop.jsx"></script>
+<script type="text/babel" src="screens-misc.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const M = { w: 390, h: 844 };   // mobile
+const D = { w: 1440, h: 900 };  // desktop
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection id="auth" title="1 · Login & first-run setup" subtitle="Passkey-first auth, password fallback · one-time setup wizard">
+        <DCArtboard id="login-m" label="Login · mobile" width={M.w} height={M.h}><ScreenLoginMobile /></DCArtboard>
+        <DCArtboard id="login-d" label="Login · desktop" width={D.w} height={D.h}><ScreenLoginDesktop /></DCArtboard>
+        <DCArtboard id="setup-m" label="Setup · mobile" width={M.w} height={M.h}><ScreenSetupMobile /></DCArtboard>
+        <DCArtboard id="setup-d" label="Setup · desktop" width={D.w} height={D.h}><ScreenSetupDesktop /></DCArtboard>
+      </DCSection>
+
+      <DCSection id="workspaces" title="2 · Workspaces dashboard & create" subtitle="Project cards with status + resources · empty state · create modal">
+        <DCArtboard id="dash-m" label="Dashboard · mobile" width={M.w} height={M.h}><ScreenDashMobile /></DCArtboard>
+        <DCArtboard id="dash-empty" label="Empty state · mobile" width={M.w} height={M.h}><ScreenDashEmpty /></DCArtboard>
+        <DCArtboard id="dash-d" label="Dashboard · desktop" width={D.w} height={D.h}><ScreenDashDesktop /></DCArtboard>
+        <DCArtboard id="create-m" label="Create · mobile" width={M.w} height={M.h}><ScreenCreateMobile /></DCArtboard>
+        <DCArtboard id="create-d" label="Create · desktop" width={D.w} height={D.h}><ScreenCreateDesktop /></DCArtboard>
+      </DCSection>
+
+      <DCSection id="ide-a" title="3 · Mobile IDE — Direction A · bottom tab bar" subtitle="One focused pane at a time; Files / Code / Terminal / AI in a persistent bottom bar (AI accented)">
+        <DCArtboard id="a-files" label="Files" width={M.w} height={M.h}><ScreenIdeAFiles /></DCArtboard>
+        <DCArtboard id="a-editor" label="Editor" width={M.w} height={M.h}><ScreenIdeAEditor /></DCArtboard>
+        <DCArtboard id="a-term" label="Terminal" width={M.w} height={M.h}><ScreenIdeATerminal /></DCArtboard>
+        <DCArtboard id="a-ai" label="AI agent" width={M.w} height={M.h}><ScreenIdeAChat /></DCArtboard>
+        <DCPostIt top={-4} right={40} rotate={3} width={186}>Direction A — familiar & explicit. Tabs always visible; AI is one tap on the thumb side.</DCPostIt>
+      </DCSection>
+
+      <DCSection id="ide-b" title="4 · Mobile IDE — Direction B · AI-first" subtitle="Chat IS the home screen; files / editor / terminal slide up as drawers when needed">
+        <DCArtboard id="b-home" label="AI home" width={M.w} height={M.h}><ScreenIdeBHome /></DCArtboard>
+        <DCArtboard id="b-drawer" label="Code drawer (peek)" width={M.w} height={M.h}><ScreenIdeBDrawer /></DCArtboard>
+        <DCArtboard id="b-switch" label="Jump-to sheet" width={M.w} height={M.h}><ScreenIdeBSwitch /></DCArtboard>
+        <DCPostIt top={-4} right={40} rotate={-3} width={186}>Direction B — bold & opinionated. Code review happens inside the conversation; the agent is the surface.</DCPostIt>
+      </DCSection>
+
+      <DCSection id="ide-d" title="5 · Workspace / IDE — desktop core" subtitle="File tree · editor · AI chat panel (right) · terminal docked below">
+        <DCArtboard id="ide-desk" label="IDE · desktop" width={D.w} height={D.h}><ScreenIdeDesktop /></DCArtboard>
+      </DCSection>
+
+      <DCSection id="chat" title="6 · AI chat — focused / expanded" subtitle="Rich conversation: reasoning, tool actions, diffs, approvals · agent switcher (Claude Code / Cursor / Codex)">
+        <DCArtboard id="chat-m" label="Chat · mobile" width={M.w} height={M.h}><ScreenChatExpandedMobile /></DCArtboard>
+        <DCArtboard id="chat-d" label="Chat · desktop" width={D.w} height={D.h}><ScreenChatExpandedDesktop /></DCArtboard>
+      </DCSection>
+
+      <DCSection id="preview" title="7 · App preview & routing" subtitle="Running ports with auto subdomains · inline frame on desktop, open-externally on mobile">
+        <DCArtboard id="prev-m" label="Preview · mobile" width={M.w} height={M.h}><ScreenPreviewMobile /></DCArtboard>
+        <DCArtboard id="prev-d" label="Preview · desktop" width={D.w} height={D.h}><ScreenPreviewDesktop /></DCArtboard>
+      </DCSection>
+
+      <DCSection id="settings" title="8 · Settings" subtitle="AI agents & API keys (BYO) · security · domain/DNS · appearance">
+        <DCArtboard id="set-m" label="Settings · mobile" width={M.w} height={M.h}><ScreenSettingsMobile /></DCArtboard>
+        <DCArtboard id="set-d" label="Settings · desktop" width={D.w} height={D.h}><ScreenSettingsDesktop /></DCArtboard>
+      </DCSection>
+
+      <DCSection id="ds" title="9 · Mini design system" subtitle="Color tokens (hex) · type scale · radius & spacing · key components">
+        <DCArtboard id="tokens" label="Tokens & components" width={1180} height={760}><ScreenTokens /></DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

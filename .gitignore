@@ -27,6 +27,9 @@ yarn-error.log*
 data/
 volumes/
 
+# Design handoff archive (extracted files are kept; the tarball is redundant)
+design/proto/*.tar.gz
+
 # OS / editor
 .DS_Store
 Thumbs.db
