@@ -1,83 +1,11 @@
 import type { ReactNode } from 'react';
+import { useParams } from 'react-router-dom';
 import { HIcon } from '../icons';
-import { AIMark, Code, StatusDot, UserMark } from '../ui';
-import { FILE_MIDDLEWARE } from '../data';
-import type { Theme, TreeNode } from '../types';
+import { AIMark, Code, StatusDot } from '../ui';
+import { FILE_MIDDLEWARE, WS } from '../data';
+import type { TreeNode } from '../types';
 import { AgentText, Bubble, ToolCard } from '../mobile/panes';
-
-function WinChrome({ url, children }: { url: string; children: ReactNode }) {
-  return (
-    <div
-      style={{
-        width: 1440,
-        height: 900,
-        borderRadius: 12,
-        overflow: 'hidden',
-        background: 'var(--surface)',
-        boxShadow: 'var(--shadow-lg)',
-        display: 'flex',
-        flexDirection: 'column',
-        border: '1px solid var(--border)',
-      }}
-    >
-      <div style={{ height: 42, flexShrink: 0, background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 14, padding: '0 14px' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {['#FF5F57', '#FEBC2E', '#28C840'].map((c, i) => (
-            <div key={i} style={{ width: 12, height: 12, borderRadius: 6, background: c, opacity: 0.9 }} />
-          ))}
-        </div>
-        <div style={{ flex: 1, maxWidth: 460, height: 26, borderRadius: 7, background: 'var(--bg)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, padding: '0 11px', margin: '0 auto' }}>
-          <HIcon name="lock" size={11} color="var(--faint)" />
-          <span className="mono" style={{ fontSize: 11.5, color: 'var(--text-2)' }}>
-            {url}
-          </span>
-        </div>
-        <div style={{ flex: 1 }} />
-      </div>
-      <div style={{ flex: 1, minHeight: 0 }}>{children}</div>
-    </div>
-  );
-}
-
-function DeskRail({ onToggleTheme, theme }: { onToggleTheme: () => void; theme: Theme }) {
-  const items: [string, boolean][] = [
-    ['grid', false],
-    ['folder', true],
-    ['terminal', false],
-    ['globe', false],
-    ['gear', false],
-  ];
-  return (
-    <div style={{ width: 58, flexShrink: 0, background: 'var(--surface-2)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '14px 0', gap: 6 }}>
-      <div style={{ width: 32, height: 32, borderRadius: 9, background: 'var(--bg)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-        <span style={{ width: 13, height: 13, borderRadius: 4, background: 'var(--accent)', transform: 'rotate(45deg)' }} />
-      </div>
-      {items.map(([ic, on], i) => (
-        <div
-          key={i}
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 11,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: on ? 'var(--surface)' : 'transparent',
-            boxShadow: on ? '0 1px 3px rgba(0,0,0,.15)' : 'none',
-            border: on ? '1px solid var(--border-soft)' : '1px solid transparent',
-          }}
-        >
-          <HIcon name={ic} size={19} color={on ? 'var(--text)' : 'var(--faint)'} sw={on ? 1.8 : 1.6} />
-        </div>
-      ))}
-      <div style={{ flex: 1 }} />
-      <button onClick={onToggleTheme} className="btn btn-ghost btn-icon" style={{ width: 40, height: 40 }}>
-        <HIcon name={theme === 'dark' ? 'sun' : 'moon'} size={18} color="var(--muted)" />
-      </button>
-      <UserMark size={32} />
-    </div>
-  );
-}
+import { DeskRail } from './DesktopShell';
 
 const DTREE: TreeNode[] = [
   { d: 0, ic: 'folder', n: 'src', open: true },
@@ -131,23 +59,17 @@ function DTerm() {
   );
 }
 
-export function DesktopIDE({
-  theme,
-  onToggleTheme,
-  framed = false,
-}: {
-  theme: Theme;
-  onToggleTheme: () => void;
-  framed?: boolean;
-}) {
-  const content = (
+export function DesktopIDE() {
+  const { id } = useParams();
+  const ws = WS.find((w) => w.id === id) ?? WS[0];
+  return (
     <div style={{ height: '100%', display: 'flex', background: 'var(--bg)' }}>
-        <DeskRail theme={theme} onToggleTheme={onToggleTheme} />
+        <DeskRail />
         {/* file tree */}
         <div style={{ width: 234, flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--surface-2)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ height: 44, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', borderBottom: '1px solid var(--border)' }}>
             <span className="mono" style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>
-              storefront-api
+              {ws.id}
             </span>
             <HIcon name="search" size={15} color="var(--faint)" />
             <HIcon name="plus" size={16} color="var(--faint)" />
@@ -174,7 +96,7 @@ export function DesktopIDE({
           <div style={{ height: 44, flexShrink: 0, borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px' }}>
             <span className="chip chip-sm">
               <HIcon name="branch" size={12} color="var(--muted)" />
-              main
+              {ws.branch}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <StatusDot on live />
@@ -259,9 +181,4 @@ export function DesktopIDE({
         </div>
       </div>
   );
-
-  if (framed) {
-    return <WinChrome url="storefront-api.sawadev.io/edit">{content}</WinChrome>;
-  }
-  return <div style={{ width: '100%', height: '100%', overflow: 'auto', background: 'var(--bg)' }}>{content}</div>;
 }

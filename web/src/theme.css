@@ -74,6 +74,8 @@ body {
   --good: #4ed08a;
   --good-soft: rgba(78, 208, 138, 0.14);
   --warn: #e0a458;
+  --danger: #ef6b6b;
+  --danger-line: rgba(239, 107, 107, 0.4);
   --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.4);
   --term-bg: #0b0b0e;
@@ -111,6 +113,8 @@ body {
   --good: #1f9d5e;
   --good-soft: #e1f4ea;
   --warn: #c2862e;
+  --danger: #d6453f;
+  --danger-line: rgba(214, 69, 63, 0.32);
   --shadow-lg: 0 24px 60px rgba(30, 28, 22, 0.16), 0 2px 8px rgba(30, 28, 22, 0.06);
   --shadow-md: 0 8px 28px rgba(30, 28, 22, 0.1);
   --term-bg: #14141a;

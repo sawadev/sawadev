@@ -48,6 +48,7 @@ export const HICONS: Record<string, string> = {
   bolt: 'M8.6 1.6L3.4 9h3.8l-.6 5.4L12.6 7H8.8z',
   trash: 'M3.5 4.5h9 M6 4.5V3h4v1.5 M4.5 4.5l.7 9h5.6l.7-9',
   arrowR: 'M3 8h10 M9 4l4 4-4 4',
+  logout: 'M6.4 2.4H2.6v11.2h3.8 M10 4.8L13.4 8 10 11.2 M5.5 8h7.9',
 };
 
 export interface HIconProps {

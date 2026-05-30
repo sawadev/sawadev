@@ -30,6 +30,9 @@ volumes/
 # Design handoff archive (extracted files are kept; the tarball is redundant)
 design/proto/*.tar.gz
 
+# Claude Code — local personal overrides (shared config stays versioned)
+.claude/settings.local.json
+
 # OS / editor
 .DS_Store
 Thumbs.db

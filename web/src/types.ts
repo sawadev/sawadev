@@ -1,5 +1,5 @@
 export type Theme = 'dark' | 'light';
-export type Device = 'mobile' | 'desktop';
+export type Device = 'mobile' | 'tablet' | 'desktop';
 
 /** A single syntax-highlighted segment: [tokenClass, text]. */
 export type CodeSeg = [string, string];

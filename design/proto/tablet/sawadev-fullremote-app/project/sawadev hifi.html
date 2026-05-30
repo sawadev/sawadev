@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>sawadev · hi-fi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="hifi-theme.css" />
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+  #root { height: 100vh; }
+  .stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .stage.dark { background: radial-gradient(circle at 50% -10%, #17171d 0%, #08080a 70%); }
+  .stage.light { background: radial-gradient(circle at 50% -10%, #ffffff 0%, #e6e4df 75%); }
+  .devsw { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 30; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="hifi-ui.jsx"></script>
+<script type="text/babel" src="hifi-mobile.jsx"></script>
+<script type="text/babel" src="hifi-mobile-shell.jsx"></script>
+<script type="text/babel" src="hifi-desktop.jsx"></script>
+<script type="text/babel" src="hifi-tablet.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "light",
+  "accent": "#7C5CF6",
+  "device": "desktop"
+}/*EDITMODE-END*/;
+
+function useViewportScale(w, h, pad) {
+  const [scale, setScale] = React.useState(1);
+  React.useLayoutEffect(() => {
+    const fit = () => {
+      const s = Math.min((window.innerWidth - pad) / w, (window.innerHeight - pad) / h);
+      setScale(Math.min(s, 1));
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [w, h, pad]);
+  return scale;
+}
+
+function DeviceSwitch({ device, onChange }) {
+  const opts = [['mobile', 'phone', 'Mobile'], ['tablet', 'tablet', 'Tablet'], ['desktop', 'monitor', 'Desktop']];
+  return (
+    <div className="devsw">
+      <div className="seg" style={{ boxShadow: 'var(--shadow-md)' }}>
+        {opts.map(([k, ic, label]) => (
+          <button key={k} className={device === k ? 'on' : ''} onClick={() => onChange(k)}>
+            <HIcon name={ic} size={14} color="currentColor" />{label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const theme = t.theme, accent = t.accent, device = t.device;
+  const toggleTheme = () => setTweak('theme', theme === 'dark' ? 'light' : 'dark');
+  const setAccent = (hex) => setTweak('accent', hex);
+
+  const SIZES = { mobile: [402, 874, 80], tablet: [1226, 866, 96], desktop: [1440, 900, 96] };
+  const [W, H, pad] = SIZES[device] || SIZES.mobile;
+  const scale = useViewportScale(W, H, pad);
+
+  return (
+    <div className={'sawa'} data-theme={theme} style={{ '--accent': accent }}>
+      <div className={'stage ' + theme}>
+        <div style={{ width: W * scale, height: H * scale, position: 'relative' }}>
+          <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+            {device === 'mobile' && (
+              <IOSDevice width={402} height={874} dark={theme === 'dark'}>
+                <MobileApp theme={theme} onToggleTheme={toggleTheme} accent={accent} onAccent={setAccent} />
+              </IOSDevice>
+            )}
+            {device === 'tablet' && <TabletApp theme={theme} onToggleTheme={toggleTheme} />}
+            {device === 'desktop' && <DesktopIDE theme={theme} onToggleTheme={toggleTheme} />}
+          </div>
+        </div>
+      </div>
+
+      <DeviceSwitch device={device} onChange={(d) => setTweak('device', d)} />
+
+      <TweaksPanel>
+        <TweakSection label="Appearance" />
+        <TweakRadio label="Theme" value={theme} options={['dark', 'light']} onChange={(v) => setTweak('theme', v)} />
+        <TweakColor label="Accent" value={accent} options={['#7C5CF6', '#3B82F6', '#1F9D5E', '#E0922E']} onChange={setAccent} />
+        <TweakSection label="Device" />
+        <TweakRadio label="View" value={device} options={['mobile', 'tablet', 'desktop']} onChange={(v) => setTweak('device', v)} />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
