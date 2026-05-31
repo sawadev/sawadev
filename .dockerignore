@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+**/dist
+**/.vite
+data
+**/*.tsbuildinfo
+.git
+.github
+design
+docs
+images
+deploy
+**/*.md
+.DS_Store

@@ -1,0 +1,48 @@
+# Dev local (macOS / Docker Desktop) : build des images localement, sans DNS
+# public. Caddy sert en HTTP simple sur *.localhost ; pas de DNS-01.
+#
+#   docker compose -f docker-compose.dev.yml up --build
+#
+# Pour le développement courant on privilégie toutefois `bun run dev` à la
+# racine (Vite + bun --watch), plus rapide. Ce fichier sert à tester la
+# stack conteneurisée de bout en bout.
+
+services:
+  orchestrator:
+    build:
+      context: ..
+      dockerfile: images/orchestrator/Dockerfile
+    image: sawadev/orchestrator:dev
+    restart: unless-stopped
+    environment:
+      DOMAIN: localhost
+      RP_ID: localhost
+      RP_ORIGIN: http://localhost
+      PREVIEW_SCHEME: http
+      CADDY_ADMIN: http://caddy:2019
+      DOCKER_NETWORK: sawadev_net
+      WORKSPACE_IMAGE: busybox
+      WORKSPACES_DIR: /data/workspaces
+      SAWADEV_SECRET: dev-only-secret-change-me
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - sawadev_data:/data
+    networks:
+      - sawadev_net
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+    networks:
+      - sawadev_net
+
+networks:
+  sawadev_net:
+    name: sawadev_net
+
+volumes:
+  sawadev_data:

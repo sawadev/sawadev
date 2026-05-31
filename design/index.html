@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>sawadev — design & design system</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Jetons issus de apps/web/src/theme.css (source de vérité). */
+      .sawa {
+        --accent: #7c5cf6;
+        --on-accent: #fff;
+        --r-md: 11px;
+        --r-lg: 16px;
+        --font-ui: 'Hanken Grotesk', system-ui, sans-serif;
+        --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+        font-family: var(--font-ui);
+        color: var(--text);
+      }
+      .sawa,
+      .sawa[data-theme='dark'] {
+        --bg: #0e0e11; --surface: #16161a; --surface-2: #1c1c22; --elevated: #24242b;
+        --border: #2a2a31; --border-soft: #1f1f25; --text: #ececef; --text-2: #b6b6be;
+        --muted: #87878f; --faint: #5b5b64;
+        --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+        --accent-line: color-mix(in srgb, var(--accent) 38%, transparent);
+        --accent-text: color-mix(in oklab, var(--accent), #fff 34%);
+        --good: #4ed08a; --warn: #e0a458; --term-bg: #0b0b0e;
+        --c-kw: #b79cff; --c-fn: #82aaff; --c-str: #9fd68b; --c-num: #f2a06b;
+        --c-com: #5b5b64; --c-var: #e4e4ea; --c-type: #ffcb8b; --c-punct: #8a8a93;
+      }
+      .sawa[data-theme='light'] {
+        --bg: #f4f3f0; --surface: #fff; --surface-2: #fbfaf8; --elevated: #fff;
+        --border: #e5e3dd; --border-soft: #edebe5; --text: #232220; --text-2: #54534e;
+        --muted: #76756e; --faint: #a8a79f;
+        --accent-soft: color-mix(in srgb, var(--accent) 13%, #fff);
+        --accent-line: color-mix(in srgb, var(--accent) 36%, #fff);
+        --accent-text: color-mix(in oklab, var(--accent), #000 10%);
+        --good: #1f9d5e; --warn: #c2862e; --term-bg: #14141a;
+        --c-kw: #8a3fd1; --c-fn: #2d6bd8; --c-str: #2c8c52; --c-num: #c2570b;
+        --c-com: #9a9890; --c-var: #2b2a27; --c-type: #b07a18; --c-punct: #8c8b84;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); transition: background 0.2s; }
+      .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 28px 80px; }
+      .mono { font-family: var(--font-mono); }
+      h1 { font-size: clamp(30px, 5vw, 46px); font-weight: 800; letter-spacing: -1.4px; margin: 14px 0 6px; }
+      h2 { font-size: 13px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--accent-text); margin: 56px 0 18px; }
+      .sub { color: var(--muted); font-size: 17px; max-width: 60ch; line-height: 1.5; }
+      .grid { display: grid; gap: 14px; }
+      .swatches { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+      .sw { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: var(--surface); }
+      .sw .chip { height: 60px; }
+      .sw .lab { padding: 8px 10px; font-size: 12px; }
+      .sw .name { font-weight: 600; color: var(--text); }
+      .sw .val { color: var(--faint); }
+      .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 22px; }
+      .btn { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-weight: 600; border: none; height: 44px; padding: 0 18px; border-radius: var(--r-md); cursor: pointer; color: var(--text); background: var(--surface-2); }
+      .btn-primary { background: var(--accent); color: var(--on-accent); }
+      .btn-outline { background: transparent; border: 1.5px solid var(--border); }
+      .pill { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 8px; font-size: 12.5px; font-weight: 600; background: var(--elevated); color: var(--text-2); border: 1px solid var(--border-soft); }
+      .pill-accent { background: var(--accent-soft); color: var(--accent-text); border-color: var(--accent-line); }
+      .dot { width: 7px; height: 7px; border-radius: 5px; background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent); display: inline-block; }
+      .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+      .gallery { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+      .shot { border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); }
+      .shot img { width: 100%; display: block; background: var(--surface-2); }
+      .shot .cap { padding: 12px 14px; font-size: 13.5px; color: var(--text-2); }
+      .logo { display: inline-flex; align-items: center; gap: 9px; font-family: var(--font-mono); font-weight: 700; font-size: 20px; letter-spacing: -0.5px; }
+      .logo i { width: 11px; height: 11px; border-radius: 3px; background: var(--accent); transform: rotate(45deg); display: inline-block; }
+      .toggle { position: fixed; top: 18px; right: 18px; }
+      .codeline { font-family: var(--font-mono); font-size: 13px; line-height: 1.7; }
+    </style>
+  </head>
+  <body>
+    <div class="sawa" data-theme="dark" id="root">
+      <button type="button" class="btn btn-outline toggle" onclick="t()">Thème</button>
+      <div class="wrap">
+        <div class="logo"><i></i> sawadev</div>
+        <h1>Design &amp; design system</h1>
+        <p class="sub">
+          Trace statique du design de sawadev (issue du handoff Claude Design). Le prototype
+          interactif a été retiré : la source de vérité vivante est désormais
+          <span class="mono">apps/web/src/theme.css</span> et les composants React. Cette page
+          récapitule les jetons, les composants et les écrans clés.
+        </p>
+
+        <h2>Marque</h2>
+        <div class="card row" style="gap: 28px">
+          <img src="./brand/logo.svg" alt="Logo sawadev" width="120" height="120" style="border-radius: 26px" />
+          <div>
+            <div style="font-weight: 700; font-size: 16px">Logo sawadev</div>
+            <div style="color: var(--muted); font-size: 14px; margin: 4px 0 12px">
+              Losange violet sur tuile sombre — déclinaison du favicon.
+            </div>
+            <div class="row">
+              <a class="btn btn-outline" href="./brand/logo.svg" download>SVG</a>
+              <a class="btn btn-outline" href="./brand/logo.png" download>PNG 512</a>
+            </div>
+          </div>
+        </div>
+
+        <h2>Palette</h2>
+        <div class="grid swatches" id="swatches"></div>
+
+        <h2>Typographie</h2>
+        <div class="card">
+          <div style="font-family: var(--font-ui); font-size: 30px; font-weight: 800; letter-spacing: -1px">
+            Hanken Grotesk — interface
+          </div>
+          <div style="color: var(--muted); margin-top: 4px">400 · 500 · 600 · 700 · 800</div>
+          <div class="mono" style="font-size: 20px; font-weight: 600; margin-top: 18px">
+            JetBrains Mono — code &amp; mono
+          </div>
+          <div class="mono" style="color: var(--muted); margin-top: 4px">const sawadev = "cloud";</div>
+        </div>
+
+        <h2>Composants</h2>
+        <div class="card">
+          <div class="row">
+            <button class="btn btn-primary">Primary</button>
+            <button class="btn">Soft</button>
+            <button class="btn btn-outline">Outline</button>
+            <span class="pill">chip</span>
+            <span class="pill pill-accent">accent</span>
+            <span class="row" style="gap: 6px"><span class="dot"></span> running</span>
+          </div>
+          <div style="margin-top: 20px; background: var(--term-bg); border-radius: 10px; padding: 14px">
+            <div class="codeline"><span style="color: var(--c-kw)">export function</span> <span style="color: var(--c-fn)">requireAuth</span><span style="color: var(--c-punct)">(</span><span style="color: var(--c-var)">req</span><span style="color: var(--c-punct)">) {</span></div>
+            <div class="codeline">&nbsp;&nbsp;<span style="color: var(--c-kw)">const</span> <span style="color: var(--c-var)">token</span> = <span style="color: var(--c-var)">header</span>.<span style="color: var(--c-fn)">slice</span>(<span style="color: var(--c-num)">7</span>) <span style="color: var(--c-com)">// bearer</span></div>
+            <div class="codeline"><span style="color: var(--c-punct)">}</span></div>
+          </div>
+        </div>
+
+        <h2>Écrans</h2>
+        <div class="grid gallery">
+          <figure class="shot" style="margin: 0"><img src="./screens/overview.png" alt="Vue d'ensemble" /><figcaption class="cap">Vue d'ensemble — flux Login &amp; setup (mobile + desktop)</figcaption></figure>
+          <figure class="shot" style="margin: 0"><img src="./screens/login.png" alt="Login" /><figcaption class="cap">Login — passkey-first, repli mot de passe</figcaption></figure>
+          <figure class="shot" style="margin: 0"><img src="./screens/ide-desktop.png" alt="IDE desktop" /><figcaption class="cap">IDE desktop — arbre · éditeur · panneau IA · terminal</figcaption></figure>
+          <figure class="shot" style="margin: 0"><img src="./screens/tablet-ide.png" alt="IDE tablette" /><figcaption class="cap">IDE tablette — vue de travail + panneau IA persistant</figcaption></figure>
+          <figure class="shot" style="margin: 0"><img src="./screens/mobile-ide.png" alt="IDE mobile" /><figcaption class="cap">IDE mobile — barre d'onglets (Files · Editor · AI · Terminal · Preview)</figcaption></figure>
+          <figure class="shot" style="margin: 0"><img src="./screens/mobile-flow.png" alt="Flux mobile" /><figcaption class="cap">Flux mobile — navigation au pouce</figcaption></figure>
+          <figure class="shot" style="margin: 0"><img src="./screens/light-theme.png" alt="Thème clair" /><figcaption class="cap">Thème clair</figcaption></figure>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const TOKENS = [
+        'bg', 'surface', 'surface-2', 'elevated', 'border', 'text', 'text-2', 'muted', 'faint',
+        'accent', 'accent-soft', 'accent-text', 'good', 'warn', 'term-bg',
+        'c-kw', 'c-fn', 'c-str', 'c-num', 'c-type', 'c-var', 'c-punct', 'c-com',
+      ];
+      const root = document.getElementById('root');
+      function render() {
+        const cs = getComputedStyle(root);
+        document.getElementById('swatches').innerHTML = TOKENS.map((n) => {
+          const v = cs.getPropertyValue('--' + n).trim();
+          return `<div class="sw"><div class="chip" style="background: var(--${n})"></div><div class="lab"><div class="name">--${n}</div><div class="val mono">${v}</div></div></div>`;
+        }).join('');
+      }
+      function t() {
+        root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        render();
+      }
+      render();
+    </script>
+  </body>
+</html>
