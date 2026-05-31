@@ -156,7 +156,7 @@ function Nav({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void
               fontWeight: 600,
             }}
           >
-            4.2k
+            0
           </span>
         </a>
         <GhButton primary>
