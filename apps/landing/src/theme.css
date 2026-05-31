@@ -1,0 +1,242 @@
+/* theme.css — sawadev hi-fi tokens (dark default + light). From the design handoff. */
+
+.sawa {
+  --accent: #7c5cf6;
+  --accent-press: #6b4ae8;
+  --on-accent: #ffffff;
+
+  --r-sm: 8px;
+  --r-md: 11px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --ease: cubic-bezier(0.22, 0.7, 0.3, 1);
+  --font-ui: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  color: var(--text);
+}
+
+/* ── DARK (default) ───────────────────────────────── */
+.sawa,
+.sawa[data-theme='dark'] {
+  --bg: #0e0e11;
+  --bg-grad: radial-gradient(120% 80% at 50% -10%, #18181f 0%, #0e0e11 60%);
+  --surface: #16161a;
+  --surface-2: #1c1c22;
+  --elevated: #24242b;
+  --border: #2a2a31;
+  --border-soft: #1f1f25;
+  --hover: rgba(255, 255, 255, 0.04);
+  --text: #ececef;
+  --text-2: #b6b6be;
+  --muted: #87878f;
+  --faint: #5b5b64;
+  --accent-press: color-mix(in oklab, var(--accent), #000 15%);
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent) 38%, transparent);
+  --accent-text: color-mix(in oklab, var(--accent), #fff 34%);
+  --good: #4ed08a;
+  --good-soft: rgba(78, 208, 138, 0.14);
+  --warn: #e0a458;
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.4);
+  --term-bg: #0b0b0e;
+  --diff-add: rgba(78, 208, 138, 0.13);
+  --diff-del: rgba(224, 107, 107, 0.12);
+  --scrim: rgba(0, 0, 0, 0.6);
+  --c-kw: #b79cff;
+  --c-fn: #82aaff;
+  --c-str: #9fd68b;
+  --c-num: #f2a06b;
+  --c-com: #5b5b64;
+  --c-var: #e4e4ea;
+  --c-type: #ffcb8b;
+  --c-punct: #8a8a93;
+}
+
+/* ── LIGHT ────────────────────────────────────────── */
+.sawa[data-theme='light'] {
+  --bg: #f4f3f0;
+  --bg-grad: radial-gradient(120% 80% at 50% -10%, #ffffff 0%, #f1f0ec 70%);
+  --surface: #ffffff;
+  --surface-2: #fbfaf8;
+  --elevated: #ffffff;
+  --border: #e5e3dd;
+  --border-soft: #edebe5;
+  --hover: rgba(0, 0, 0, 0.03);
+  --text: #232220;
+  --text-2: #54534e;
+  --muted: #76756e;
+  --faint: #a8a79f;
+  --accent-press: color-mix(in oklab, var(--accent), #000 12%);
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, #fff);
+  --accent-line: color-mix(in srgb, var(--accent) 36%, #fff);
+  --accent-text: color-mix(in oklab, var(--accent), #000 10%);
+  --good: #1f9d5e;
+  --good-soft: #e1f4ea;
+  --warn: #c2862e;
+  --shadow-lg: 0 24px 60px rgba(30, 28, 22, 0.16), 0 2px 8px rgba(30, 28, 22, 0.06);
+  --shadow-md: 0 8px 28px rgba(30, 28, 22, 0.1);
+  --term-bg: #14141a;
+  --diff-add: #e4f5ec;
+  --diff-del: #fbe9e7;
+  --scrim: rgba(30, 28, 22, 0.32);
+  --c-kw: #8a3fd1;
+  --c-fn: #2d6bd8;
+  --c-str: #2c8c52;
+  --c-num: #c2570b;
+  --c-com: #9a9890;
+  --c-var: #2b2a27;
+  --c-type: #b07a18;
+  --c-punct: #8c8b84;
+}
+
+.sawa * {
+  box-sizing: border-box;
+}
+.sawa,
+.sawa * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── primitives ──────────────────────────────────── */
+.sawa .mono {
+  font-family: var(--font-mono);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: var(--r-md);
+  font-size: 15px;
+  white-space: nowrap;
+  transition: transform 0.12s var(--ease), box-shadow 0.15s, opacity 0.15s;
+  color: var(--text);
+  background: var(--surface-2);
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 18px var(--accent-soft);
+}
+.btn-primary:hover {
+  background: var(--accent-press);
+}
+.btn-outline {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  color: var(--text);
+}
+.btn-soft {
+  background: var(--elevated);
+  border: 1px solid var(--border-soft);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+}
+.btn-sm {
+  height: 34px;
+  padding: 0 13px;
+  font-size: 13px;
+  border-radius: var(--r-sm);
+}
+.btn-icon {
+  width: 40px;
+  padding: 0;
+}
+.btn-icon.btn-sm {
+  width: 34px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 8px;
+  background: var(--elevated);
+  color: var(--text-2);
+  border: 1px solid var(--border-soft);
+  white-space: nowrap;
+}
+.chip-sm {
+  height: 24px;
+  font-size: 11.5px;
+  padding: 0 9px;
+}
+.chip-accent {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border-color: var(--accent-line);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.dot-on {
+  background: var(--good);
+  box-shadow: 0 0 0 3px var(--good-soft);
+}
+
+/* code */
+.code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+.code .ln {
+  color: var(--faint);
+  user-select: none;
+}
+.tk-kw {
+  color: var(--c-kw);
+}
+.tk-fn {
+  color: var(--c-fn);
+}
+.tk-str {
+  color: var(--c-str);
+}
+.tk-num {
+  color: var(--c-num);
+}
+.tk-com {
+  color: var(--c-com);
+  font-style: italic;
+}
+.tk-var {
+  color: var(--c-var);
+}
+.tk-type {
+  color: var(--c-type);
+}
+.tk-p {
+  color: var(--c-punct);
+}

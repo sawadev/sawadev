@@ -1,0 +1,167 @@
+/* landing.css — marketing layout (from the design handoff <style> block). */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+body {
+  overflow: hidden;
+}
+#root {
+  height: 100vh;
+}
+.lp-scroll {
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--bg);
+  scroll-behavior: smooth;
+}
+
+.lp-wrap {
+  width: 100%;
+  max-width: 1140px;
+  margin: 0 auto;
+  padding-left: 28px;
+  padding-right: 28px;
+}
+.lp-section {
+  padding: 96px 0;
+}
+
+.lp-h1 {
+  font-size: clamp(34px, 5.2vw, 58px);
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -1.4px;
+  margin: 20px 0 0;
+  max-width: 14ch;
+}
+.lp-h2 {
+  font-size: clamp(26px, 3.4vw, 40px);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -1px;
+  margin: 14px 0 0;
+}
+.lp-sub {
+  font-size: clamp(15px, 1.5vw, 18px);
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 52ch;
+  margin: 18px 0 28px;
+}
+
+/* hero */
+.lp-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 56px;
+  align-items: center;
+  padding-top: 72px;
+  padding-bottom: 96px;
+}
+.lp-install {
+  margin-top: 26px;
+  max-width: 400px;
+  font-size: 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 13px 15px;
+  color: var(--text-2);
+}
+
+/* devices */
+.lp-devrow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(20px, 5vw, 72px);
+}
+
+/* features */
+.lp-feat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+.lp-feat {
+  padding: 26px;
+}
+
+/* steps */
+.lp-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.lp-step {
+  padding: 28px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.lp-cmd {
+  font-size: 12.5px;
+  background: var(--term-bg);
+  color: rgba(220, 220, 212, 0.92);
+  border-radius: 9px;
+  padding: 11px 13px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+/* cta */
+.lp-cta {
+  position: relative;
+  border-radius: 26px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 72px 32px;
+  overflow: hidden;
+}
+
+/* responsive */
+@media (max-width: 900px) {
+  .lp-section {
+    padding: 72px 0;
+  }
+  .lp-hero {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    padding-top: 48px;
+  }
+  .lp-herovis {
+    order: 2;
+  }
+  .lp-feat-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .lp-steps {
+    grid-template-columns: 1fr;
+  }
+  .lp-navlinks {
+    display: none !important;
+  }
+  .lp-devrow {
+    flex-wrap: wrap;
+    gap: 32px;
+  }
+}
+@media (max-width: 560px) {
+  .lp-wrap {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  .lp-feat-grid {
+    grid-template-columns: 1fr;
+  }
+  .lp-star {
+    display: none !important;
+  }
+  .lp-heroai {
+    display: none !important;
+  }
+}
