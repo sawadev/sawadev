@@ -2,6 +2,7 @@ import type { CreateWorkspaceRequest } from '@sawadev/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAuthState, login, loginWithPasskey, logout, registerPasskey, setup } from './auth';
 import { listFiles, readFile, writeFile } from './files';
+import { addPort, listPorts, removePort } from './ports';
 import {
   createWorkspace,
   deleteWorkspace,
@@ -106,5 +107,27 @@ export function useSaveFile(workspaceId: string) {
   return useMutation({
     mutationFn: ({ path, content }: { path: string; content: string }) =>
       writeFile(workspaceId, path, content),
+  });
+}
+
+// ── Ports / preview ──────────────────────────────────────────────────────────
+
+export function usePorts(workspaceId: string) {
+  return useQuery({ queryKey: ['ports', workspaceId], queryFn: () => listPorts(workspaceId) });
+}
+
+export function useAddPort(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (port: number) => addPort(workspaceId, port),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ports', workspaceId] }),
+  });
+}
+
+export function useRemovePort(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (port: number) => removePort(workspaceId, port),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ports', workspaceId] }),
   });
 }

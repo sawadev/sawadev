@@ -1,5 +1,6 @@
-import type { CreateWorkspaceRequest } from '@sawadev/shared';
+import type { CreatePortRequest, CreateWorkspaceRequest } from '@sawadev/shared';
 import { Hono } from 'hono';
+import { addPort, listPorts, removePort } from './ports';
 import {
   createWorkspace,
   deleteWorkspace,
@@ -44,6 +45,28 @@ export function workspaceRoutes(): Hono {
 
   app.delete('/:id', async (c) => {
     const ok = await deleteWorkspace(c.req.param('id'));
+    return ok ? c.json({ ok: true }) : c.json({ error: 'not_found' }, 404);
+  });
+
+  // ── Ports / preview ──
+  app.get('/:id/ports', (c) => c.json(listPorts(c.req.param('id'))));
+
+  app.post('/:id/ports', async (c) => {
+    const body = (await c.req.json().catch(() => null)) as CreatePortRequest | null;
+    if (!body || !Number.isInteger(body.port)) return c.json({ error: 'invalid_port' }, 400);
+    try {
+      return c.json(await addPort(c.req.param('id'), body.port), 201);
+    } catch (err) {
+      const msg = (err as Error).message;
+      if (msg === 'workspace_not_found') return c.json({ error: msg }, 404);
+      if (msg === 'invalid_port') return c.json({ error: msg }, 400);
+      return c.json({ error: 'route_failed', detail: msg }, 502);
+    }
+  });
+
+  app.delete('/:id/ports/:port', async (c) => {
+    const port = Number(c.req.param('port'));
+    const ok = await removePort(c.req.param('id'), port);
     return ok ? c.json({ ok: true }) : c.json({ error: 'not_found' }, 404);
   });
 

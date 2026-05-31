@@ -66,4 +66,16 @@ export const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    id: 3,
+    name: 'ports',
+    sql: /* sql */ `
+      CREATE TABLE ports (
+        workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        port         INTEGER NOT NULL,
+        subdomain    TEXT NOT NULL UNIQUE,
+        PRIMARY KEY (workspace_id, port)
+      );
+    `,
+  },
 ];

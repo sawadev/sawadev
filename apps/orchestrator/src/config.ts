@@ -27,6 +27,12 @@ export interface AppConfig {
   workspacesDir: string;
   /** Réseau Docker auquel rattacher les workspaces. */
   dockerNetwork: string;
+  /** Domaine de base pour les sous-domaines de preview (ex. example.com). */
+  domain: string;
+  /** URL de l'API Admin de Caddy (jamais exposée publiquement). */
+  caddyAdmin: string;
+  /** Schéma des URLs de preview (https en prod, http en dev local). */
+  previewScheme: 'http' | 'https';
 }
 
 function envStr(key: string, fallback: string): string {
@@ -59,6 +65,11 @@ export function getConfig(): AppConfig {
     workspaceImage: envStr('WORKSPACE_IMAGE', 'node:20-bookworm-slim'),
     workspacesDir: resolve(envStr('WORKSPACES_DIR', './data/workspaces')),
     dockerNetwork: envStr('DOCKER_NETWORK', 'sawadev_net'),
+    domain: envStr('DOMAIN', 'localhost'),
+    caddyAdmin: envStr('CADDY_ADMIN', 'http://localhost:2019'),
+    previewScheme: envStr('PREVIEW_SCHEME', rpOrigin.startsWith('https://') ? 'https' : 'http') as
+      | 'http'
+      | 'https',
   };
   return cached;
 }

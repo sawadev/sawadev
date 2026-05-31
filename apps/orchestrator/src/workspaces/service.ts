@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CreateWorkspaceRequest, Workspace, WorkspaceStatus } from '@sawadev/shared';
+import { deletePreviewRoute } from '../caddy/client';
 import { getConfig } from '../config';
 import { getDb } from '../db';
 import {
@@ -155,8 +156,14 @@ export async function stopWorkspace(id: string): Promise<Workspace | null> {
 export async function deleteWorkspace(id: string): Promise<boolean> {
   const row = getRow(id);
   if (!row) return false;
+  // Retire les routes Caddy de preview avant de tout supprimer.
+  const ports = getDb()
+    .query<{ subdomain: string }, [string]>('SELECT subdomain FROM ports WHERE workspace_id = ?')
+    .all(id);
+  for (const p of ports) await deletePreviewRoute(p.subdomain).catch(() => undefined);
   const container = await getManagedContainer(id);
   if (container) await container.remove({ force: true }).catch(() => undefined);
+  getDb().run('DELETE FROM ports WHERE workspace_id = ?', [id]);
   getDb().run('DELETE FROM workspaces WHERE id = ?', [id]);
   // Supprime le volume bind (la suppression d'un workspace est explicite).
   rmSync(row.volume, { recursive: true, force: true });

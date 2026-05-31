@@ -4,6 +4,7 @@ import { FileTree } from '../editor/FileTree';
 import { WorkspaceFileEditor } from '../editor/WorkspaceFileEditor';
 import { HIcon } from '../icons';
 import { AgentText, Bubble, ToolCard } from '../mobile/panes';
+import { WorkspacePreview } from '../preview/WorkspacePreview';
 import { WorkspaceTerminal } from '../terminal/Terminal';
 import { AIMark, StatusDot } from '../ui';
 import { DeskRail } from './DesktopShell';
@@ -49,6 +50,7 @@ export function DesktopIDE() {
   const { id } = useParams();
   const workspaceId = id ?? '';
   const [openFile, setOpenFile] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   return (
     <div style={{ height: '100%', display: 'flex', background: 'var(--bg)' }}>
       <DeskRail />
@@ -104,17 +106,25 @@ export function DesktopIDE() {
             <span style={{ fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>running</span>
           </div>
           <div style={{ flex: 1 }} />
-          <button className="btn btn-outline btn-sm">
-            <HIcon name="globe" size={14} color="var(--text)" />
+          <button
+            type="button"
+            className={showPreview ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'}
+            onClick={() => setShowPreview((v) => !v)}
+          >
+            <HIcon
+              name="globe"
+              size={14}
+              color={showPreview ? 'var(--on-accent)' : 'var(--text)'}
+            />
             Preview
-          </button>
-          <button className="btn btn-outline btn-sm">
-            <HIcon name="play" size={14} color="var(--text)" />
-            Run
           </button>
         </div>
         <div style={{ flex: 1, minHeight: 0 }}>
-          <WorkspaceFileEditor workspaceId={workspaceId} path={openFile} />
+          {showPreview ? (
+            <WorkspacePreview workspaceId={workspaceId} />
+          ) : (
+            <WorkspaceFileEditor workspaceId={workspaceId} path={openFile} />
+          )}
         </div>
         <DTerm workspaceId={workspaceId} />
       </div>
