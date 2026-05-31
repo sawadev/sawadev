@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useStartWorkspace, useWorkspaces } from '../api/hooks';
 import { DeskRail } from '../desktop/DesktopShell';
 import { FileTree } from '../editor/FileTree';
 import { WorkspaceFileEditor } from '../editor/WorkspaceFileEditor';
 import { HIcon } from '../icons';
-import { AgentPanel } from '../ide/AgentPanel';
 import { EditorTabs } from '../ide/EditorTabs';
+import { IdeStateProvider } from '../ide/IdeState';
+import { RightDock } from '../ide/RightDock';
 import { StatsChip } from '../ide/StatsChip';
-import { useOpenFiles } from '../ide/useOpenFiles';
+import { useIde } from '../ide/ide-context';
 import { WorkspacePreview } from '../preview/WorkspacePreview';
 import { WorkspaceTerminal } from '../terminal/Terminal';
 import { StatusDot } from '../ui';
@@ -23,17 +25,29 @@ const PANES: { k: string; icon: string; label: string }[] = [
 export function TabletIDE() {
   const { id } = useParams();
   const workspaceId = id ?? '';
+  return (
+    <IdeStateProvider key={workspaceId} workspaceId={workspaceId}>
+      <TabletIDEBody workspaceId={workspaceId} />
+    </IdeStateProvider>
+  );
+}
 
+function TabletIDEBody({ workspaceId }: { workspaceId: string }) {
   const [tab, setTab] = useState('editor');
-  const files = useOpenFiles();
+  const files = useIde();
+  const { data: workspaces = [] } = useWorkspaces();
+  const status = workspaces.find((w) => w.id === workspaceId)?.status;
+  const running = status === 'running';
+  const start = useStartWorkspace();
 
   const leftPane = {
     files: (
       <FileTree
         workspaceId={workspaceId}
         currentPath={files.active}
-        onOpen={(p) => {
-          files.open(p);
+        onOpen={(p, persistent) => {
+          if (persistent) files.openPersistent(p);
+          else files.open(p);
           setTab('editor');
         }}
       />
@@ -43,11 +57,18 @@ export function TabletIDE() {
         <EditorTabs
           tabs={files.tabs}
           active={files.active}
+          dirty={files.dirty}
+          preview={files.preview}
           onActivate={files.setActive}
           onClose={files.close}
+          onPromote={files.promote}
         />
         <div style={{ flex: 1, minHeight: 0 }}>
-          <WorkspaceFileEditor workspaceId={workspaceId} path={files.active} />
+          <WorkspaceFileEditor
+            workspaceId={workspaceId}
+            path={files.active}
+            onDirtyChange={files.setDirty}
+          />
         </div>
       </div>
     ),
@@ -80,11 +101,24 @@ export function TabletIDE() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
               <HIcon name="branch" size={11} color="var(--faint)" />
               <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>main</span>
-              <StatusDot on live />
-              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>running</span>
+              <StatusDot on={running} live={running} />
+              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{status ?? '…'}</span>
             </div>
           </div>
-          <StatsChip workspaceId={workspaceId} />
+          {running ? (
+            <StatsChip workspaceId={workspaceId} />
+          ) : (
+            <button
+              type="button"
+              className="btn btn-ghost btn-icon btn-sm"
+              title={start.isPending ? 'Starting…' : 'Start workspace'}
+              aria-label="Start workspace"
+              disabled={start.isPending}
+              onClick={() => start.mutate(workspaceId)}
+            >
+              <HIcon name="play" size={14} color="var(--good)" />
+            </button>
+          )}
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
             <div className="seg">
               {PANES.map((p) => (
@@ -111,7 +145,7 @@ export function TabletIDE() {
       </div>
 
       {/* persistent AI panel — redimensionnable + repliable */}
-      <AgentPanel workspaceId={workspaceId} defaultWidth={416} />
+      <RightDock workspaceId={workspaceId} defaultWidth={416} headerHeight={56} />
     </div>
   );
 }

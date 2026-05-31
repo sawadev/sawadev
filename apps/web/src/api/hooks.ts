@@ -1,5 +1,5 @@
 import type { CreateWorkspaceRequest } from '@sawadev/shared';
-import type { KeyProvider } from '@sawadev/shared';
+import type { KeyProvider, WorkspaceUiState } from '@sawadev/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   deletePasskey,
@@ -11,7 +11,16 @@ import {
   registerPasskey,
   setup,
 } from './auth';
-import { createDir, deletePath, listFiles, moveFile, readFile, writeFile } from './files';
+import {
+  createDir,
+  deletePath,
+  getUiState,
+  listFiles,
+  moveFile,
+  putUiState,
+  readFile,
+  writeFile,
+} from './files';
 import { addPort, listPorts, removePort } from './ports';
 import { deleteKey, getVersion, listKeys, setKey, startUpdate } from './settings';
 import {
@@ -82,7 +91,14 @@ export function useDeletePasskey() {
 // ── Workspaces ───────────────────────────────────────────────────────────────
 
 export function useWorkspaces() {
-  return useQuery({ queryKey: WS_KEY, queryFn: listWorkspaces });
+  return useQuery({
+    queryKey: WS_KEY,
+    queryFn: listWorkspaces,
+    // Statut runtime (running/stopped) sondé en direct : re-fetch périodique +
+    // au retour sur l'onglet, pour refléter les changements (idle-stop, start/stop…).
+    refetchInterval: 6000,
+    refetchOnWindowFocus: true,
+  });
 }
 
 function useInvalidateWorkspaces() {
@@ -142,9 +158,29 @@ export function useFileContent(workspaceId: string, path: string | null) {
 }
 
 export function useSaveFile(workspaceId: string) {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ path, content }: { path: string; content: string }) =>
       writeFile(workspaceId, path, content),
+    // Synchronise le cache avec le contenu sauvegardé → l'état « modifié » retombe.
+    onSuccess: (_res, { path, content }) => {
+      qc.setQueryData(['file', workspaceId, path], { content });
+    },
+  });
+}
+
+/** Contexte IDE persistant du workspace (chargé à l'ouverture, synchronisé entre appareils). */
+export function useUiState(workspaceId: string) {
+  return useQuery({
+    queryKey: ['ui-state', workspaceId],
+    queryFn: () => getUiState(workspaceId),
+    staleTime: Number.POSITIVE_INFINITY, // chargé une fois ; le provider tient l'état de travail
+  });
+}
+
+export function useSaveUiState(workspaceId: string) {
+  return useMutation({
+    mutationFn: (state: WorkspaceUiState) => putUiState(workspaceId, state),
   });
 }
 

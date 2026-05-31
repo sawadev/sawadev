@@ -1,20 +1,10 @@
+import { Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useUI } from '../context';
-import { HIcon } from '../icons';
-import { UserMark } from '../ui';
-
-const NAV: { icon: string; to: string; match: (p: string) => boolean }[] = [
-  { icon: 'grid', to: '/workspaces', match: (p) => p === '/workspaces' || p === '/' },
-  { icon: 'folder', to: '/workspaces/storefront-api', match: (p) => p.startsWith('/workspaces/') },
-  { icon: 'gear', to: '/settings', match: (p) => p === '/settings' },
-];
+import { useNavigate } from 'react-router-dom';
 
 /** Persistent left rail used by the desktop dashboard / settings pages. */
 export function DeskRail() {
   const nav = useNavigate();
-  const { pathname } = useLocation();
-  const { theme, toggleTheme } = useUI();
   return (
     <div
       style={{
@@ -55,47 +45,29 @@ export function DeskRail() {
           }}
         />
       </button>
-      {NAV.map((it, i) => {
-        const on = it.match(pathname);
-        return (
-          <button
-            key={i}
-            onClick={() => nav(it.to)}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 11,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              background: on ? 'var(--surface)' : 'transparent',
-              boxShadow: on ? '0 1px 3px rgba(0,0,0,.15)' : 'none',
-              border: on ? '1px solid var(--border-soft)' : '1px solid transparent',
-            }}
-          >
-            <HIcon
-              name={it.icon}
-              size={19}
-              color={on ? 'var(--text)' : 'var(--faint)'}
-              sw={on ? 1.8 : 1.6}
-            />
-          </button>
-        );
-      })}
       <div style={{ flex: 1 }} />
       <button
-        onClick={toggleTheme}
-        className="btn btn-ghost btn-icon"
-        style={{ width: 40, height: 40 }}
-      >
-        <HIcon name={theme === 'dark' ? 'sun' : 'moon'} size={18} color="var(--muted)" />
-      </button>
-      <button
         onClick={() => nav('/settings')}
+        aria-label="Settings"
+        title="Settings"
         style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}
       >
-        <UserMark size={32} />
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            flexShrink: 0,
+            background: 'var(--elevated)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Settings size={17} strokeWidth={1.7} />
+        </div>
       </button>
     </div>
   );

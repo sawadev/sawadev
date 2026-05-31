@@ -8,7 +8,6 @@ import {
   useCreateWorkspace,
   useDeleteApiKey,
   useDeletePasskey,
-  useDeleteWorkspace,
   useLogin,
   useLoginWithPasskey,
   useLogout,
@@ -22,16 +21,18 @@ import {
   useWorkspaces,
 } from '../api/hooks';
 import { useUI } from '../context';
-import { ACCENTS, BOTPAD, TOPPAD, WS } from '../data';
+import { ACCENTS, BOTPAD, TOPPAD } from '../data';
 import { FileTree } from '../editor/FileTree';
 import { WorkspaceFileEditor } from '../editor/WorkspaceFileEditor';
 import { HIcon } from '../icons';
 import { EditorTabs } from '../ide/EditorTabs';
-import { useOpenFiles } from '../ide/useOpenFiles';
+import { IdeStateProvider } from '../ide/IdeState';
+import { useIde } from '../ide/ide-context';
 import { WorkspacePreview } from '../preview/WorkspacePreview';
 import { PROVIDER_LABEL } from '../providers';
 import { WorkspaceTerminal } from '../terminal/Terminal';
 import { Logo, StatusDot, UserMark } from '../ui';
+import { WorkspaceConfig } from '../ui/WorkspaceConfig';
 import { stackLabel, workspaceIcon } from '../workspace-display';
 
 /** Traduit une erreur d'API en message lisible pour l'écran de login. */
@@ -198,14 +199,15 @@ export function MobileDashboard() {
   const createM = useCreateWorkspace();
   const startM = useStartWorkspace();
   const stopM = useStopWorkspace();
-  const deleteM = useDeleteWorkspace();
   const [query, setQuery] = useState('');
+  const [configId, setConfigId] = useState<string | null>(null);
 
   const running = workspaces.filter((w) => w.status === 'running').length;
   const q = query.trim().toLowerCase();
   const shown = q
     ? workspaces.filter((w) => `${w.name} ${w.id} ${w.image}`.toLowerCase().includes(q))
     : workspaces;
+  const configWs = workspaces.find((w) => w.id === configId) ?? null;
 
   const onNew = () => {
     const name = window.prompt('Workspace name?');
@@ -275,8 +277,24 @@ export function MobileDashboard() {
               <div
                 key={w.id}
                 className="card"
-                style={{ padding: 15, display: 'flex', flexDirection: 'column', gap: 13 }}
+                style={{
+                  position: 'relative',
+                  padding: 15,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 13,
+                }}
               >
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon btn-sm"
+                  aria-label="Workspace settings"
+                  title="Workspace settings"
+                  onClick={() => setConfigId(w.id)}
+                  style={{ position: 'absolute', top: 9, right: 9 }}
+                >
+                  <HIcon name="gear" size={16} color="var(--muted)" />
+                </button>
                 <button
                   type="button"
                   onClick={() => nav(`/workspaces/${w.id}`)}
@@ -306,7 +324,9 @@ export function MobileDashboard() {
                     <HIcon name={workspaceIcon(w.image)} size={20} color="var(--text-2)" />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600 }}>{w.name}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
+                      {w.name}
+                    </div>
                     <div
                       className="mono"
                       style={{ fontSize: 11.5, color: 'var(--faint)', marginTop: 2 }}
@@ -327,26 +347,38 @@ export function MobileDashboard() {
                   <button
                     type="button"
                     className="btn btn-soft btn-sm"
-                    onClick={() => (on ? stopM.mutate(w.id) : startM.mutate(w.id))}
-                  >
-                    {on ? 'Stop' : 'Start'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-soft btn-sm"
-                    style={{ color: 'var(--danger)' }}
+                    disabled={
+                      (startM.isPending && startM.variables === w.id) ||
+                      (stopM.isPending && stopM.variables === w.id)
+                    }
                     onClick={() => {
-                      if (window.confirm(`Delete ${w.name}? This removes its data.`))
-                        deleteM.mutate(w.id);
+                      if (on) {
+                        if (
+                          window.confirm(`Stop ${w.name}? Running processes will be interrupted.`)
+                        )
+                          stopM.mutate(w.id);
+                      } else startM.mutate(w.id);
                     }}
                   >
-                    <HIcon name="trash" size={14} color="var(--danger)" />
+                    <HIcon
+                      name={on ? 'stop' : 'play'}
+                      size={13}
+                      color={on ? 'var(--danger)' : 'var(--good)'}
+                    />
+                    {on
+                      ? stopM.isPending && stopM.variables === w.id
+                        ? 'Stopping…'
+                        : 'Stop'
+                      : startM.isPending && startM.variables === w.id
+                        ? 'Starting…'
+                        : 'Start'}
                   </button>
                 </div>
               </div>
             );
           })}
         </div>
+        {configWs && <WorkspaceConfig workspace={configWs} onClose={() => setConfigId(null)} />}
       </div>
       <div style={{ position: 'absolute', right: 18, bottom: BOTPAD + 14 }}>
         <button
@@ -379,13 +411,23 @@ const TABS: { k: string; icon: string; label: string; center?: boolean }[] = [
 ];
 
 export function MobileIDE() {
-  const nav = useNavigate();
   const { id } = useParams();
   const workspaceId = id ?? '';
-  const { theme, toggleTheme } = useUI();
-  const ws = WS.find((w) => w.id === id) ?? WS[0];
+  return (
+    <IdeStateProvider key={workspaceId} workspaceId={workspaceId}>
+      <MobileIDEBody workspaceId={workspaceId} />
+    </IdeStateProvider>
+  );
+}
 
-  const files = useOpenFiles();
+function MobileIDEBody({ workspaceId }: { workspaceId: string }) {
+  const nav = useNavigate();
+  const { theme, toggleTheme } = useUI();
+  const { data: workspaces = [] } = useWorkspaces();
+  const ws = workspaces.find((w) => w.id === workspaceId);
+  const running = ws?.status === 'running';
+
+  const files = useIde();
   const [tab, setTab] = useState('ai');
 
   const pane: Record<string, JSX.Element> = {
@@ -394,8 +436,9 @@ export function MobileIDE() {
       <FileTree
         workspaceId={workspaceId}
         currentPath={files.active}
-        onOpen={(p) => {
-          files.open(p);
+        onOpen={(p, persistent) => {
+          if (persistent) files.openPersistent(p);
+          else files.open(p);
           setTab('editor');
         }}
       />
@@ -405,11 +448,18 @@ export function MobileIDE() {
         <EditorTabs
           tabs={files.tabs}
           active={files.active}
+          dirty={files.dirty}
+          preview={files.preview}
           onActivate={files.setActive}
           onClose={files.close}
+          onPromote={files.promote}
         />
         <div style={{ flex: 1, minHeight: 0 }}>
-          <WorkspaceFileEditor workspaceId={workspaceId} path={files.active} />
+          <WorkspaceFileEditor
+            workspaceId={workspaceId}
+            path={files.active}
+            onDirtyChange={files.setDirty}
+          />
         </div>
       </div>
     ),
@@ -439,13 +489,11 @@ export function MobileIDE() {
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="mono" style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.1 }}>
-              {ws.id}
+              {ws?.name ?? workspaceId}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-              <HIcon name="branch" size={11} color="var(--faint)" />
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{ws.branch}</span>
-              <StatusDot on live />
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>running</span>
+              <StatusDot on={running} live={running} />
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{ws?.status ?? '…'}</span>
             </div>
           </div>
           <button

@@ -1,251 +1,441 @@
 import type { FileNode } from '@sawadev/shared';
-import { useState } from 'react';
+import {
+  ChevronDown,
+  ChevronRight,
+  File as FileIcon,
+  FilePlus,
+  FileText,
+  Folder as FolderIcon,
+  FolderOpen,
+  FolderPlus,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useFileTreeActions, useFiles } from '../api/hooks';
-import { HIcon } from '../icons';
+import { useIde } from '../ide/ide-context';
+import { Menu, type MenuItem } from '../ui/Menu';
+import { useFileWatch } from './useFileWatch';
 
 interface TreeProps {
   workspaceId: string;
   currentPath: string | null;
-  onOpen: (path: string) => void;
+  /** `persistent` = ouverture épinglée (double-clic) ; sinon aperçu temporaire (clic simple). */
+  onOpen: (path: string, persistent?: boolean) => void;
 }
 
-interface RowActions {
-  onRename: (path: string) => void;
-  onDelete: (path: string) => void;
+type NodeType = 'file' | 'dir';
+interface Selected {
+  path: string;
+  type: NodeType;
+}
+type Editing = { kind: 'rename'; path: string } | { kind: 'create'; dir: string; type: NodeType };
+
+const ICON = 15;
+const parentDir = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
+const join = (dir: string, name: string) => (dir ? `${dir}/${name}` : name);
+
+interface Ctx {
+  workspaceId: string;
+  currentPath: string | null;
+  selected: Selected | null;
+  expanded: string[];
+  editing: Editing | null;
+  dropDir: string | null;
+  dragRef: React.MutableRefObject<{ path: string; name: string; type: NodeType } | null>;
+  onOpen: (p: string, persistent?: boolean) => void;
+  select: (s: Selected) => void;
+  toggle: (dir: string) => void;
+  openContext: (e: React.MouseEvent, target: Selected | 'root') => void;
+  commit: (name: string) => void;
+  cancel: () => void;
+  setDropDir: (d: string | null) => void;
+  move: (destDir: string) => void;
+}
+const TreeCtx = createContext<Ctx | null>(null);
+function useTree(): Ctx {
+  const c = useContext(TreeCtx);
+  if (!c) throw new Error('FileTree context missing');
+  return c;
 }
 
-/** Arbre de fichiers paresseux + actions (créer / renommer / supprimer). */
+/** Arbre de fichiers : création (dropdown), clic-droit, focus, renommage inline, drag & drop. */
 export function FileTree({ workspaceId, currentPath, onOpen }: TreeProps) {
+  // Dossiers dépliés + sélection viennent du contexte persistant du workspace.
+  const { expanded, toggleExpand: toggle, expand, selected, setSelected } = useIde();
   const { newFile, newDir, rename, remove } = useFileTreeActions(workspaceId);
 
-  const actions: RowActions = {
-    onRename: (path) => {
-      const to = window.prompt('Rename / move to (path):', path);
-      if (to && to !== path) rename.mutate({ from: path, to });
-    },
-    onDelete: (path) => {
-      if (window.confirm(`Delete ${path}?`)) remove.mutate(path);
-    },
+  // Réactivité : surveille la racine + les dossiers dépliés côté serveur.
+  const watchDirs = useMemo(() => ['', ...expanded], [expanded]);
+  useFileWatch(workspaceId, watchDirs);
+  const [editing, setEditing] = useState<Editing | null>(null);
+  const [dropDir, setDropDir] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  const dragRef = useRef<{ path: string; name: string; type: NodeType } | null>(null);
+
+  const startCreate = (dir: string, type: NodeType) => {
+    if (dir) expand(dir);
+    setEditing({ kind: 'create', dir, type });
+  };
+  const cancel = () => setEditing(null);
+  const commit = (name: string) => {
+    const n = name.trim();
+    const e = editing;
+    setEditing(null);
+    if (!n || !e) return;
+    if (e.kind === 'create') {
+      const to = join(e.dir, n);
+      if (e.type === 'file') newFile.mutate(to);
+      else newDir.mutate(to);
+    } else {
+      const to = join(parentDir(e.path), n);
+      if (to !== e.path) rename.mutate({ from: e.path, to });
+    }
+  };
+  const del = (path: string) => {
+    if (window.confirm(`Delete ${path}?`)) remove.mutate(path);
   };
 
-  const createFile = () => {
-    const path = window.prompt('New file path (e.g. src/index.ts):');
-    if (path?.trim()) newFile.mutate(path.trim());
+  const createTargetDir = () =>
+    !selected ? '' : selected.type === 'dir' ? selected.path : parentDir(selected.path);
+
+  const move = (destDir: string) => {
+    const src = dragRef.current;
+    dragRef.current = null;
+    setDropDir(null);
+    if (!src) return;
+    // dossier déposé dans lui-même ou un descendant → refusé
+    if (src.type === 'dir' && (destDir === src.path || destDir.startsWith(`${src.path}/`))) return;
+    if (destDir === parentDir(src.path)) return; // même parent → no-op
+    const to = join(destDir, src.name);
+    if (to === src.path) return;
+    rename.mutate({ from: src.path, to });
+    if (destDir) expand(destDir);
   };
-  const createDir = () => {
-    const path = window.prompt('New folder path (e.g. src/lib):');
-    if (path?.trim()) newDir.mutate(path.trim());
+
+  const newItems = (dir: string): MenuItem[] => [
+    { label: 'New file', icon: <FilePlus size={14} />, onClick: () => startCreate(dir, 'file') },
+    { label: 'New folder', icon: <FolderPlus size={14} />, onClick: () => startCreate(dir, 'dir') },
+  ];
+  const itemsFor = (target: Selected | 'root'): MenuItem[] => {
+    if (target === 'root') return newItems('');
+    if (target.type === 'dir')
+      return [
+        ...newItems(target.path),
+        {
+          label: 'Rename',
+          icon: <Pencil size={14} />,
+          onClick: () => setEditing({ kind: 'rename', path: target.path }),
+        },
+        {
+          label: 'Delete',
+          icon: <Trash2 size={14} />,
+          danger: true,
+          onClick: () => del(target.path),
+        },
+      ];
+    return [
+      { label: 'Open', icon: <FileText size={14} />, onClick: () => onOpen(target.path, true) },
+      {
+        label: 'Rename',
+        icon: <Pencil size={14} />,
+        onClick: () => setEditing({ kind: 'rename', path: target.path }),
+      },
+      {
+        label: 'Delete',
+        icon: <Trash2 size={14} />,
+        danger: true,
+        onClick: () => del(target.path),
+      },
+    ];
+  };
+
+  const openContext = (e: React.MouseEvent, target: Selected | 'root') => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (target !== 'root') setSelected(target);
+    setMenu({ x: e.clientX, y: e.clientY, items: itemsFor(target) });
+  };
+  const openNew = (e: React.MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenu({ x: r.left, y: r.bottom + 4, items: newItems(createTargetDir()) });
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (editing || !selected) return;
+    if (e.key === 'F2') {
+      e.preventDefault();
+      setEditing({ kind: 'rename', path: selected.path });
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      del(selected.path);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selected.type === 'file') onOpen(selected.path);
+      else toggle(selected.path);
+    }
+  };
+
+  const ctx: Ctx = {
+    workspaceId,
+    currentPath,
+    selected,
+    expanded,
+    editing,
+    dropDir,
+    dragRef,
+    onOpen,
+    select: setSelected,
+    toggle,
+    openContext,
+    commit,
+    cancel,
+    setDropDir,
+    move,
   };
 
   return (
-    <div style={{ fontSize: 13.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          padding: '6px 8px',
-          borderBottom: '1px solid var(--border-soft)',
-        }}
-      >
-        <span
-          style={{
-            flex: 1,
-            fontSize: 11.5,
-            fontWeight: 700,
-            color: 'var(--muted)',
-            paddingLeft: 4,
+    <TreeCtx.Provider value={ctx}>
+      <div style={{ fontSize: 13.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className="ft-toolbar">
+          <span className="ft-title">FILES</span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon btn-sm"
+            title="New…"
+            onClick={openNew}
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+        <div
+          className="ft-scroll"
+          tabIndex={-1}
+          data-drop={dropDir === '' ? '' : undefined}
+          onKeyDown={onKeyDown}
+          onClick={() => setSelected(null)}
+          onContextMenu={(e) => openContext(e, 'root')}
+          onDragOver={(e) => {
+            if (dragRef.current) {
+              e.preventDefault();
+              setDropDir('');
+            }
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            move('');
           }}
         >
-          FILES
-        </span>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          title="New file"
-          onClick={createFile}
-        >
-          <HIcon name="file" size={14} color="var(--text-2)" />
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          title="New folder"
-          onClick={createDir}
-        >
-          <HIcon name="folder" size={14} color="var(--text-2)" />
-        </button>
+          <DirContents dir="" depth={0} />
+        </div>
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-        <DirContents
-          workspaceId={workspaceId}
-          path="/"
-          depth={0}
-          currentPath={currentPath}
-          onOpen={onOpen}
-          actions={actions}
-        />
-      </div>
-    </div>
+      {menu && (
+        <Menu anchor={{ x: menu.x, y: menu.y }} items={menu.items} onClose={() => setMenu(null)} />
+      )}
+    </TreeCtx.Provider>
   );
 }
 
-interface DirProps {
-  workspaceId: string;
-  path: string;
-  depth: number;
-  currentPath: string | null;
-  onOpen: (path: string) => void;
-  actions: RowActions;
-}
-
-function DirContents({ workspaceId, path, depth, currentPath, onOpen, actions }: DirProps) {
-  const { data: nodes, isLoading } = useFiles(workspaceId, path);
-  if (isLoading) return <Row depth={depth} label="Loading…" muted />;
-  if (!nodes?.length) return depth === 0 ? <Row depth={depth} label="Empty" muted /> : null;
+function DirContents({ dir, depth }: { dir: string; depth: number }) {
+  const { workspaceId, editing } = useTree();
+  const { data: nodes, isLoading } = useFiles(workspaceId, dir || '/');
+  const showCreate = editing?.kind === 'create' && editing.dir === dir;
+  if (isLoading)
+    return (
+      <div className="ft-muted" style={{ paddingLeft: 12 + depth * 14 }}>
+        Loading…
+      </div>
+    );
   return (
     <>
-      {nodes.map((n) =>
-        n.type === 'dir' ? (
-          <DirNode
-            key={n.path}
-            node={n}
-            workspaceId={workspaceId}
-            depth={depth}
-            currentPath={currentPath}
-            onOpen={onOpen}
-            actions={actions}
-          />
-        ) : (
-          <Row
-            key={n.path}
-            depth={depth}
-            icon="file"
-            label={n.name}
-            active={n.path === currentPath}
-            onClick={() => onOpen(n.path)}
-            onRename={() => actions.onRename(n.path)}
-            onDelete={() => actions.onDelete(n.path)}
-          />
-        ),
-      )}
+      {showCreate && <CreateRow depth={depth} type={editing.type} />}
+      {nodes?.length ? (
+        nodes.map((n) =>
+          n.type === 'dir' ? (
+            <DirNode key={n.path} node={n} depth={depth} />
+          ) : (
+            <Row key={n.path} node={n} type="file" depth={depth} />
+          ),
+        )
+      ) : !showCreate && depth === 0 ? (
+        <div className="ft-muted" style={{ paddingLeft: 14 }}>
+          Empty
+        </div>
+      ) : null}
     </>
   );
 }
 
-function DirNode({
-  node,
-  workspaceId,
-  depth,
-  currentPath,
-  onOpen,
-  actions,
-}: { node: FileNode } & Omit<DirProps, 'path'>) {
-  const [open, setOpen] = useState(false);
+function DirNode({ node, depth }: { node: FileNode; depth: number }) {
+  const { expanded } = useTree();
+  const open = expanded.includes(node.path);
   return (
     <>
-      <Row
-        depth={depth}
-        icon="folder"
-        label={node.name}
-        onClick={() => setOpen((o) => !o)}
-        chevron={open ? 'chevD' : 'chevR'}
-        onRename={() => actions.onRename(node.path)}
-        onDelete={() => actions.onDelete(node.path)}
-      />
-      {open && (
-        <DirContents
-          workspaceId={workspaceId}
-          path={node.path}
-          depth={depth + 1}
-          currentPath={currentPath}
-          onOpen={onOpen}
-          actions={actions}
-        />
-      )}
+      <Row node={node} type="dir" depth={depth} open={open} />
+      {open && <DirContents dir={node.path} depth={depth + 1} />}
     </>
   );
 }
 
 function Row({
+  node,
+  type,
   depth,
-  label,
-  icon,
-  chevron,
-  active,
-  muted,
-  onClick,
-  onRename,
-  onDelete,
+  open,
 }: {
+  node: FileNode;
+  type: NodeType;
   depth: number;
-  label: string;
-  icon?: string;
-  chevron?: string;
-  active?: boolean;
-  muted?: boolean;
-  onClick?: () => void;
-  onRename?: () => void;
-  onDelete?: () => void;
+  open?: boolean;
 }) {
+  const t = useTree();
+  const renaming = t.editing?.kind === 'rename' && t.editing.path === node.path;
+  const sel = t.selected?.path === node.path;
+  const active = type === 'file' && t.currentPath === node.path;
+  const destDir = type === 'dir' ? node.path : parentDir(node.path);
+  const isDrop = t.dropDir === destDir && t.dragRef.current?.path !== node.path;
+
+  const onMain = () => {
+    t.select({ path: node.path, type });
+    if (type === 'file') t.onOpen(node.path);
+    else t.toggle(node.path);
+  };
+
   return (
     <div
       className="ft-row"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        background: active ? 'var(--accent-soft)' : 'transparent',
+      data-selected={sel ? '' : undefined}
+      data-active={active ? '' : undefined}
+      data-drop={isDrop ? '' : undefined}
+      style={{ paddingLeft: 6 + depth * 14 }}
+      draggable={!renaming}
+      onDragStart={(e) => {
+        t.dragRef.current = { path: node.path, name: node.name, type };
+        e.dataTransfer.effectAllowed = 'move';
       }}
+      onDragEnd={() => {
+        t.dragRef.current = null;
+        t.setDropDir(null);
+      }}
+      onDragOver={(e) => {
+        if (t.dragRef.current) {
+          e.preventDefault();
+          e.stopPropagation();
+          t.setDropDir(destDir);
+        }
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        t.move(destDir);
+      }}
+      onContextMenu={(e) => t.openContext(e, { path: node.path, type })}
     >
       <button
         type="button"
-        onClick={onClick}
-        onDoubleClick={onRename}
-        disabled={!onClick}
-        title={onRename ? 'Double-click to rename' : undefined}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          flex: 1,
-          minWidth: 0,
-          border: 'none',
-          background: 'transparent',
-          color: muted ? 'var(--faint)' : active ? 'var(--accent-text)' : 'var(--text-2)',
-          padding: '5px 4px 5px 10px',
-          paddingLeft: 10 + depth * 14,
-          cursor: onClick ? 'pointer' : 'default',
-          textAlign: 'left',
-          font: 'inherit',
+        className="ft-main"
+        onClick={(e) => {
+          e.stopPropagation();
+          onMain();
+        }}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          if (type === 'file') t.onOpen(node.path, true); // épingle l'onglet
         }}
       >
-        {chevron ? (
-          <HIcon name={chevron} size={12} color="var(--faint)" />
+        {type === 'dir' ? (
+          open ? (
+            <ChevronDown size={13} className="ft-chev" />
+          ) : (
+            <ChevronRight size={13} className="ft-chev" />
+          )
         ) : (
-          <span style={{ width: 12 }} />
+          <span className="ft-chev-spacer" />
         )}
-        {icon && <HIcon name={icon} size={14} color="currentColor" />}
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {label}
-        </span>
+        {type === 'dir' ? (
+          open ? (
+            <FolderOpen size={ICON} />
+          ) : (
+            <FolderIcon size={ICON} />
+          )
+        ) : (
+          <FileIcon size={ICON} />
+        )}
+        {renaming ? (
+          <InlineInput initial={node.name} onCommit={t.commit} onCancel={t.cancel} />
+        ) : (
+          <span className="ft-label">{node.name}</span>
+        )}
       </button>
-      {onDelete && (
+      {!renaming && (
         <button
           type="button"
-          className="ft-del"
-          onClick={onDelete}
-          title="Delete"
-          style={{
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            padding: '0 10px',
-            color: 'var(--faint)',
+          className="ft-actions"
+          title="More…"
+          onClick={(e) => {
+            e.stopPropagation();
+            t.openContext(e, { path: node.path, type });
           }}
         >
-          <HIcon name="trash" size={13} color="currentColor" />
+          <MoreVertical size={14} />
         </button>
       )}
     </div>
+  );
+}
+
+function CreateRow({ depth, type }: { depth: number; type: NodeType }) {
+  const t = useTree();
+  return (
+    <div className="ft-row" style={{ paddingLeft: 6 + depth * 14 }}>
+      <div className="ft-main" style={{ cursor: 'default' }}>
+        <span className="ft-chev-spacer" />
+        {type === 'dir' ? <FolderIcon size={ICON} /> : <FileIcon size={ICON} />}
+        <InlineInput initial="" onCommit={t.commit} onCancel={t.cancel} />
+      </div>
+    </div>
+  );
+}
+
+function InlineInput({
+  initial,
+  onCommit,
+  onCancel,
+}: {
+  initial: string;
+  onCommit: (v: string) => void;
+  onCancel: () => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    const dot = initial.lastIndexOf('.');
+    el.setSelectionRange(0, dot > 0 ? dot : initial.length);
+  }, [initial]);
+  const finish = (save: boolean, val: string) => {
+    if (done.current) return;
+    done.current = true;
+    if (save) onCommit(val);
+    else onCancel();
+  };
+  return (
+    <input
+      ref={ref}
+      className="ft-input"
+      defaultValue={initial}
+      spellCheck={false}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') finish(true, e.currentTarget.value);
+        else if (e.key === 'Escape') finish(false, '');
+      }}
+      onBlur={(e) => finish(true, e.currentTarget.value)}
+    />
   );
 }

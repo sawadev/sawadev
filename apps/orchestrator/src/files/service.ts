@@ -66,6 +66,30 @@ export async function readWorkspaceFile(id: string, relPath: string): Promise<Fi
   return { path: toRel(root, abs), content: await readFile(abs, 'utf8') };
 }
 
+/**
+ * Résout le chemin hôte absolu d'un fichier de workspace (anti path-traversal),
+ * sans le lire — pour servir des octets bruts (images, etc.). Rejette les dossiers.
+ */
+export async function resolveWorkspaceFilePath(id: string, relPath: string): Promise<string> {
+  const root = workspaceRoot(id);
+  const abs = safeResolve(root, relPath);
+  const info = await stat(abs);
+  if (info.isDirectory()) throw new Error('is_directory');
+  return abs;
+}
+
+/**
+ * Résout le chemin hôte absolu d'un **dossier** de workspace (anti path-traversal) —
+ * pour le surveiller (fs.watch). Un `/` initial / vide désigne la racine.
+ */
+export async function resolveWorkspaceDir(id: string, relPath: string): Promise<string> {
+  const root = workspaceRoot(id);
+  const abs = safeResolve(root, relPath || '/');
+  const info = await stat(abs);
+  if (!info.isDirectory()) throw new Error('not_a_directory');
+  return abs;
+}
+
 export async function writeWorkspaceFile(
   id: string,
   relPath: string,
@@ -81,6 +105,12 @@ export async function moveWorkspacePath(id: string, from: string, to: string): P
   const root = workspaceRoot(id);
   const absFrom = safeResolve(root, from);
   const absTo = safeResolve(root, to);
+  if (absFrom === absTo) return; // no-op
+  // Refuse de déplacer un dossier dans lui-même ou un de ses descendants.
+  const rel = relative(absFrom, absTo);
+  if (rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)) {
+    throw new PathTraversalError('cannot move into descendant');
+  }
   await mkdir(dirname(absTo), { recursive: true });
   await rename(absFrom, absTo);
 }

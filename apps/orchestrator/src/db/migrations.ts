@@ -90,4 +90,15 @@ export const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    id: 5,
+    name: 'workspace_ui_state',
+    sql: /* sql */ `
+      CREATE TABLE workspace_ui_state (
+        workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+        state        TEXT NOT NULL,   -- JSON WorkspaceUiState
+        updated_at   INTEGER NOT NULL
+      );
+    `,
+  },
 ];

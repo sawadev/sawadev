@@ -6,6 +6,7 @@ import { authRoutes } from './auth/routes';
 import { getConfig } from './config';
 import { fileRoutes } from './files/routes';
 import { settingsRoutes } from './secrets/routes';
+import { uiStateRoutes } from './uistate/routes';
 import { launchUpdater } from './updater';
 import { workspaceRoutes } from './workspaces/routes';
 
@@ -27,6 +28,7 @@ export function createApp() {
 
   app.route('/api/workspaces', workspaceRoutes());
   app.route('/api/workspaces', fileRoutes());
+  app.route('/api/workspaces', uiStateRoutes());
   app.route('/api/settings', settingsRoutes());
 
   app.get('/api/system/version', (c) => {

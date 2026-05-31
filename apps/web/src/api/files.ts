@@ -1,4 +1,4 @@
-import type { FileContent, FileNode } from '@sawadev/shared';
+import type { FileContent, FileNode, WorkspaceUiState } from '@sawadev/shared';
 import { apiGet, apiPost } from './client';
 
 export function listFiles(workspaceId: string, path = '/'): Promise<FileNode[]> {
@@ -11,6 +11,28 @@ export function readFile(workspaceId: string, path: string): Promise<FileContent
   return apiGet<FileContent>(
     `/api/workspaces/${workspaceId}/file?path=${encodeURIComponent(path)}`,
   );
+}
+
+/** URL des octets bruts d'un fichier (images, SVG…), servie avec son content-type. */
+export function rawFileUrl(workspaceId: string, path: string): string {
+  return `/api/workspaces/${workspaceId}/file/raw?path=${encodeURIComponent(path)}`;
+}
+
+/** Contexte IDE persistant d'un workspace (onglets, explorateur, position). */
+export function getUiState(workspaceId: string): Promise<WorkspaceUiState> {
+  return apiGet<WorkspaceUiState>(`/api/workspaces/${workspaceId}/ui-state`);
+}
+
+export function putUiState(workspaceId: string, state: WorkspaceUiState): Promise<{ ok: true }> {
+  return fetch(`/api/workspaces/${workspaceId}/ui-state`, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(state),
+  }).then((r) => {
+    if (!r.ok) throw new Error(`http_${r.status}`);
+    return { ok: true } as const;
+  });
 }
 
 export function writeFile(

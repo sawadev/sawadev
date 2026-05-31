@@ -9,6 +9,7 @@ import { type ExecAttachment, attachExec } from './exec-attach';
 
 /** Données attachées à chaque connexion WebSocket (terminal ou agent). */
 export interface TerminalData {
+  kind: 'terminal';
   workspaceId: string;
   cmd: string[];
   /** Variables d'env injectées à l'exec (ex. clé API agent). Jamais loggées. */
@@ -18,27 +19,53 @@ export interface TerminalData {
   pendingInput: string[];
 }
 
-/** Shell interactif : bash si présent, sinon sh. */
-const SHELL = [
-  '/bin/sh',
-  '-lc',
-  'if command -v bash >/dev/null 2>&1; then exec bash; else exec sh; fi',
-];
-
 type ClientMsg = { type: 'input'; data: string } | { type: 'resize'; cols: number; rows: number };
 
 const TERMINAL_PREFIX = '/ws/terminal/';
 const AGENT_PREFIX = '/ws/agent/';
 
-/** Construit l'exec d'une session agent : injecte la clé du fournisseur choisi. */
-function agentSession(provider: KeyProvider): { cmd: string[]; env: string[] } {
+/** Nom de session tmux sûr (la barre de statut l'affiche comme nom de workspace). */
+export function sessionName(workspaceId: string): string {
+  return workspaceId.replace(/[^a-zA-Z0-9_-]/g, '-') || 'ws';
+}
+
+/**
+ * Commande terminal : se rattache à (ou crée) une session tmux persistante nommée
+ * `session`, de sorte que shell et process en cours survivent aux déconnexions.
+ * Repli vers un shell normal (non-persistant) si tmux est absent de l'image.
+ */
+export function terminalCmd(session: string): string[] {
+  return [
+    '/bin/sh',
+    '-lc',
+    `if command -v tmux >/dev/null 2>&1; then exec tmux new-session -A -s ${session}; else exec bash 2>/dev/null || exec sh; fi`,
+  ];
+}
+
+/**
+ * Commande agent : session tmux persistante exécutant `$AGENT_CMD` à la création
+ * (ignoré au rattachement → l'agent en cours continue) ; à défaut un shell. Repli si tmux absent.
+ */
+export function agentCmd(session: string): string[] {
+  return [
+    '/bin/sh',
+    '-lc',
+    `if command -v tmux >/dev/null 2>&1; then if [ -n "$AGENT_CMD" ]; then exec tmux new-session -A -s ${session} sh -lc "$AGENT_CMD"; else exec tmux new-session -A -s ${session}; fi; else if [ -n "$AGENT_CMD" ]; then exec sh -lc "$AGENT_CMD"; else exec bash 2>/dev/null || exec sh; fi; fi`,
+  ];
+}
+
+/** Construit l'exec d'une session agent : injecte la clé du fournisseur + `AGENT_CMD` (jamais loggés). */
+function agentSession(
+  provider: KeyProvider,
+  workspaceId: string,
+): { cmd: string[]; env: string[] } {
   const env: string[] = [];
   const key = getDecryptedKey(provider);
   if (key) env.push(`${PROVIDER_ENV[provider]}=${key}`);
-  // Commande de l'agent configurable ; à défaut, un shell (l'agent peut être lancé à la main).
-  const agentCmd = Bun.env.AGENT_CMD;
-  const cmd = agentCmd ? ['/bin/sh', '-lc', agentCmd] : SHELL;
-  return { cmd, env };
+  // Commande de l'agent configurable ; passée en env pour éviter tout problème de quoting.
+  const agentCommand = Bun.env.AGENT_CMD;
+  if (agentCommand) env.push(`AGENT_CMD=${agentCommand}`);
+  return { cmd: agentCmd(`${sessionName(workspaceId)}-agent`), env };
 }
 
 function isProvider(p: string): p is KeyProvider {
@@ -70,12 +97,12 @@ export function tryUpgradeWs(
   if (isAgent) {
     const providerParam = url.searchParams.get('provider') ?? 'anthropic';
     if (!isProvider(providerParam)) return new Response('unknown_provider', { status: 400 });
-    session = agentSession(providerParam);
+    session = agentSession(providerParam, workspaceId);
   } else {
-    session = { cmd: SHELL, env: [] };
+    session = { cmd: terminalCmd(sessionName(workspaceId)), env: [] };
   }
 
-  const data: TerminalData = { workspaceId, ...session, pendingInput: [] };
+  const data: TerminalData = { kind: 'terminal', workspaceId, ...session, pendingInput: [] };
   const upgraded = server.upgrade(req, { data });
   return upgraded ? undefined : new Response('upgrade_failed', { status: 426 });
 }

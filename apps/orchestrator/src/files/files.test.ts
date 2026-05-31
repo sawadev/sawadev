@@ -85,4 +85,11 @@ describe('CRUD fichiers', () => {
     const top = await listDir('w', '/');
     expect(top[0]?.type).toBe('dir');
   });
+
+  it('move : refuse un dossier dans son propre descendant', async () => {
+    await writeWorkspaceFile('w', 'src/index.ts', '');
+    await expect(moveWorkspacePath('w', 'src', 'src/nested')).rejects.toBeInstanceOf(
+      PathTraversalError,
+    );
+  });
 });

@@ -8,7 +8,6 @@ import {
   useCreateWorkspace,
   useDeleteApiKey,
   useDeletePasskey,
-  useDeleteWorkspace,
   useLogin,
   useLoginWithPasskey,
   useLogout,
@@ -26,6 +25,7 @@ import { ACCENTS } from '../data';
 import { HIcon } from '../icons';
 import { PROVIDER_LABEL } from '../providers';
 import { Logo, StatusDot } from '../ui';
+import { WorkspaceConfig } from '../ui/WorkspaceConfig';
 import { stackLabel, workspaceIcon } from '../workspace-display';
 import { DeskFrame } from './DesktopShell';
 
@@ -197,13 +197,14 @@ export function DesktopWorkspaces() {
   const createM = useCreateWorkspace();
   const startM = useStartWorkspace();
   const stopM = useStopWorkspace();
-  const deleteM = useDeleteWorkspace();
   const [query, setQuery] = useState('');
+  const [configId, setConfigId] = useState<string | null>(null);
   const running = workspaces.filter((w) => w.status === 'running').length;
   const q = query.trim().toLowerCase();
   const shown = q
     ? workspaces.filter((w) => `${w.name} ${w.id} ${w.image}`.toLowerCase().includes(q))
     : workspaces;
+  const configWs = workspaces.find((w) => w.id === configId) ?? null;
 
   const onNew = () => {
     const name = window.prompt('Workspace name?');
@@ -275,8 +276,24 @@ export function DesktopWorkspaces() {
               <div
                 key={w.id}
                 className="card"
-                style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}
+                style={{
+                  position: 'relative',
+                  padding: 18,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 16,
+                }}
               >
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon btn-sm"
+                  aria-label="Workspace settings"
+                  title="Workspace settings"
+                  onClick={() => setConfigId(w.id)}
+                  style={{ position: 'absolute', top: 10, right: 10 }}
+                >
+                  <HIcon name="gear" size={16} color="var(--muted)" />
+                </button>
                 <button
                   type="button"
                   onClick={() => nav(`/workspaces/${w.id}`)}
@@ -306,7 +323,9 @@ export function DesktopWorkspaces() {
                     <HIcon name={workspaceIcon(w.image)} size={21} color="var(--text-2)" />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600 }}>{w.name}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
+                      {w.name}
+                    </div>
                     <div
                       className="mono"
                       style={{ fontSize: 11.5, color: 'var(--faint)', marginTop: 2 }}
@@ -327,26 +346,38 @@ export function DesktopWorkspaces() {
                   <button
                     type="button"
                     className="btn btn-soft btn-sm"
-                    onClick={() => (on ? stopM.mutate(w.id) : startM.mutate(w.id))}
-                  >
-                    {on ? 'Stop' : 'Start'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-soft btn-sm"
-                    style={{ color: 'var(--danger)' }}
+                    disabled={
+                      (startM.isPending && startM.variables === w.id) ||
+                      (stopM.isPending && stopM.variables === w.id)
+                    }
                     onClick={() => {
-                      if (window.confirm(`Delete ${w.name}? This removes its data.`))
-                        deleteM.mutate(w.id);
+                      if (on) {
+                        if (
+                          window.confirm(`Stop ${w.name}? Running processes will be interrupted.`)
+                        )
+                          stopM.mutate(w.id);
+                      } else startM.mutate(w.id);
                     }}
                   >
-                    <HIcon name="trash" size={14} color="var(--danger)" />
+                    <HIcon
+                      name={on ? 'stop' : 'play'}
+                      size={13}
+                      color={on ? 'var(--danger)' : 'var(--good)'}
+                    />
+                    {on
+                      ? stopM.isPending && stopM.variables === w.id
+                        ? 'Stopping…'
+                        : 'Stop'
+                      : startM.isPending && startM.variables === w.id
+                        ? 'Starting…'
+                        : 'Start'}
                   </button>
                 </div>
               </div>
             );
           })}
         </div>
+        {configWs && <WorkspaceConfig workspace={configWs} onClose={() => setConfigId(null)} />}
       </div>
     </DeskFrame>
   );

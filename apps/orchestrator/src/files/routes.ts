@@ -8,6 +8,7 @@ import {
   listDir,
   moveWorkspacePath,
   readWorkspaceFile,
+  resolveWorkspaceFilePath,
   writeWorkspaceFile,
 } from './service';
 
@@ -39,6 +40,18 @@ export function fileRoutes(): Hono {
     if (!path) return c.json({ error: 'missing_path' }, 400);
     try {
       return c.json(await readWorkspaceFile(c.req.param('id'), path));
+    } catch (err) {
+      return fail(c, err);
+    }
+  });
+
+  // Octets bruts d'un fichier (images, etc.) : content-type auto via Bun.file, streamé.
+  app.get('/:id/file/raw', async (c) => {
+    const path = c.req.query('path');
+    if (!path) return c.json({ error: 'missing_path' }, 400);
+    try {
+      const abs = await resolveWorkspaceFilePath(c.req.param('id'), path);
+      return new Response(Bun.file(abs));
     } catch (err) {
       return fail(c, err);
     }
