@@ -19,10 +19,11 @@ import { ACCENTS, BOTPAD, SEED_MSGS, TOPPAD, WS, buildAgentRun } from '../data';
 import { FileTree } from '../editor/FileTree';
 import { WorkspaceFileEditor } from '../editor/WorkspaceFileEditor';
 import { HIcon } from '../icons';
+import { WorkspaceTerminal } from '../terminal/Terminal';
 import type { Msg } from '../types';
 import { Logo, StatusDot, UserMark } from '../ui';
 import { stackLabel, workspaceIcon } from '../workspace-display';
-import { AIPane, PreviewPane, TerminalPane } from './panes';
+import { AIPane, PreviewPane } from './panes';
 
 /** Traduit une erreur d'API en message lisible pour l'écran de login. */
 function authErrorMessage(err: unknown): string {
@@ -381,7 +382,7 @@ export function MobileIDE() {
       />
     ),
     editor: <WorkspaceFileEditor workspaceId={workspaceId} path={openFile} />,
-    terminal: <TerminalPane />,
+    terminal: <WorkspaceTerminal workspaceId={workspaceId} />,
     preview: <PreviewPane />,
   };
 

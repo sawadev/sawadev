@@ -1,27 +1,18 @@
-import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { FileTree } from '../editor/FileTree';
 import { WorkspaceFileEditor } from '../editor/WorkspaceFileEditor';
 import { HIcon } from '../icons';
 import { AgentText, Bubble, ToolCard } from '../mobile/panes';
+import { WorkspaceTerminal } from '../terminal/Terminal';
 import { AIMark, StatusDot } from '../ui';
 import { DeskRail } from './DesktopShell';
 
-function DTerm() {
-  const L = ({ children, c, p }: { children: ReactNode; c?: string; p?: boolean }) => (
-    <div
-      className="mono"
-      style={{ fontSize: 12, lineHeight: 1.75, color: c || 'rgba(220,220,212,0.9)' }}
-    >
-      {p && <span style={{ color: 'var(--accent-text)' }}>$ </span>}
-      {children}
-    </div>
-  );
+function DTerm({ workspaceId }: { workspaceId: string }) {
   return (
     <div
       style={{
-        height: 196,
+        height: 220,
         flexShrink: 0,
         borderTop: '1px solid var(--border)',
         display: 'flex',
@@ -33,70 +24,22 @@ function DTerm() {
         style={{
           height: 34,
           display: 'flex',
-          alignItems: 'stretch',
+          alignItems: 'center',
+          gap: 7,
+          padding: '0 14px',
           borderBottom: '1px solid rgba(255,255,255,0.07)',
-          paddingLeft: 4,
         }}
       >
-        {(
-          [
-            ['Terminal', true],
-            ['Agent · claude', false],
-            ['Output', false],
-          ] as [string, boolean][]
-        ).map(([l, on], i) => (
-          <div
-            key={i}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
-              padding: '0 14px',
-              borderBottom: on ? '2px solid var(--accent)' : '2px solid transparent',
-            }}
-          >
-            <HIcon
-              name="terminal"
-              size={12}
-              color={on ? 'rgba(235,235,230,0.95)' : 'rgba(220,220,212,0.45)'}
-            />
-            <span
-              className="mono"
-              style={{
-                fontSize: 11.5,
-                color: on ? 'rgba(235,235,230,0.95)' : 'rgba(220,220,212,0.45)',
-                fontWeight: on ? 600 : 400,
-              }}
-            >
-              {l}
-            </span>
-          </div>
-        ))}
+        <HIcon name="terminal" size={12} color="rgba(235,235,230,0.95)" />
+        <span
+          className="mono"
+          style={{ fontSize: 11.5, color: 'rgba(235,235,230,0.95)', fontWeight: 600 }}
+        >
+          Terminal
+        </span>
       </div>
-      <div style={{ flex: 1, padding: '12px 16px', overflow: 'hidden' }}>
-        <L p c="rgba(240,240,233,0.95)">
-          claude "add JWT auth middleware"
-        </L>
-        <L c="rgba(160,160,152,0.9)">
-          ● Claude Code · analyzing repo… ↳ read src/server.ts, src/auth/
-        </L>
-        <L c="var(--accent-text)">✎ editing src/auth/middleware.ts +24 −3</L>
-        <L p c="rgba(240,240,233,0.95)">
-          npm run test auth
-        </L>
-        <L c="#7fd99a"> ✓ 14 passing (1.2s)</L>
-        <L p c="rgba(240,240,233,0.95)">
-          <span
-            style={{
-              display: 'inline-block',
-              width: 8,
-              height: 15,
-              background: 'rgba(240,240,233,0.9)',
-              verticalAlign: 'text-bottom',
-              animation: 'pulse 1.1s steps(1) infinite',
-            }}
-          />
-        </L>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <WorkspaceTerminal workspaceId={workspaceId} />
       </div>
     </div>
   );
@@ -173,7 +116,7 @@ export function DesktopIDE() {
         <div style={{ flex: 1, minHeight: 0 }}>
           <WorkspaceFileEditor workspaceId={workspaceId} path={openFile} />
         </div>
-        <DTerm />
+        <DTerm workspaceId={workspaceId} />
       </div>
       {/* AI panel */}
       <div

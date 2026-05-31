@@ -53,3 +53,10 @@ export function revokeSession(token: string | undefined): void {
   if (!token) return;
   getDb().run('DELETE FROM sessions WHERE id = ?', [token]);
 }
+
+/** Extrait et valide la session depuis un en-tête Cookie brut (upgrade WS). */
+export function validateSessionFromCookieHeader(header: string | null): string | null {
+  if (!header) return null;
+  const match = header.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`));
+  return validateSession(match?.[1]);
+}
