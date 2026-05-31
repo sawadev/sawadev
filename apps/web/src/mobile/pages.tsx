@@ -16,11 +16,13 @@ import {
 } from '../api/hooks';
 import { useUI } from '../context';
 import { ACCENTS, BOTPAD, SEED_MSGS, TOPPAD, WS, buildAgentRun } from '../data';
+import { FileTree } from '../editor/FileTree';
+import { WorkspaceFileEditor } from '../editor/WorkspaceFileEditor';
 import { HIcon } from '../icons';
 import type { Msg } from '../types';
 import { Logo, StatusDot, UserMark } from '../ui';
 import { stackLabel, workspaceIcon } from '../workspace-display';
-import { AIPane, EditorPane, FilesPane, PreviewPane, TerminalPane } from './panes';
+import { AIPane, PreviewPane, TerminalPane } from './panes';
 
 /** Traduit une erreur d'API en message lisible pour l'écran de login. */
 function authErrorMessage(err: unknown): string {
@@ -339,9 +341,11 @@ const TABS: { k: string; icon: string; label: string; center?: boolean }[] = [
 export function MobileIDE() {
   const nav = useNavigate();
   const { id } = useParams();
+  const workspaceId = id ?? '';
   const { theme, toggleTheme } = useUI();
   const ws = WS.find((w) => w.id === id) ?? WS[0];
 
+  const [openFile, setOpenFile] = useState<string | null>(null);
   const [tab, setTab] = useState('ai');
   const [msgs, setMsgs] = useState<Msg[]>(SEED_MSGS);
   const [running, setRunning] = useState(false);
@@ -366,8 +370,17 @@ export function MobileIDE() {
 
   const pane: Record<string, JSX.Element> = {
     ai: <AIPane msgs={msgs} running={running} onSend={send} />,
-    files: <FilesPane onOpen={() => setTab('editor')} />,
-    editor: <EditorPane onAskAI={() => setTab('ai')} />,
+    files: (
+      <FileTree
+        workspaceId={workspaceId}
+        currentPath={openFile}
+        onOpen={(p) => {
+          setOpenFile(p);
+          setTab('editor');
+        }}
+      />
+    ),
+    editor: <WorkspaceFileEditor workspaceId={workspaceId} path={openFile} />,
     terminal: <TerminalPane />,
     preview: <PreviewPane />,
   };

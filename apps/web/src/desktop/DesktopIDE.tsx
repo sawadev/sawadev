@@ -1,26 +1,12 @@
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { FILE_MIDDLEWARE, WS } from '../data';
+import { FileTree } from '../editor/FileTree';
+import { WorkspaceFileEditor } from '../editor/WorkspaceFileEditor';
 import { HIcon } from '../icons';
 import { AgentText, Bubble, ToolCard } from '../mobile/panes';
-import type { TreeNode } from '../types';
-import { AIMark, Code, StatusDot } from '../ui';
+import { AIMark, StatusDot } from '../ui';
 import { DeskRail } from './DesktopShell';
-
-const DTREE: TreeNode[] = [
-  { d: 0, ic: 'folder', n: 'src', open: true },
-  { d: 1, ic: 'folder', n: 'auth', open: true },
-  { d: 2, ic: 'file', n: 'middleware.ts', cur: true, badge: 'M' },
-  { d: 2, ic: 'file', n: 'tokens.ts' },
-  { d: 1, ic: 'folder', n: 'routes' },
-  { d: 1, ic: 'file', n: 'server.ts' },
-  { d: 1, ic: 'file', n: 'db.ts' },
-  { d: 0, ic: 'folder', n: 'tests' },
-  { d: 0, ic: 'file', n: 'package.json' },
-  { d: 0, ic: 'file', n: 'Dockerfile' },
-  { d: 0, ic: 'file', n: '.env' },
-  { d: 0, ic: 'file', n: 'README.md' },
-];
 
 function DTerm() {
   const L = ({ children, c, p }: { children: ReactNode; c?: string; p?: boolean }) => (
@@ -118,7 +104,8 @@ function DTerm() {
 
 export function DesktopIDE() {
   const { id } = useParams();
-  const ws = WS.find((w) => w.id === id) ?? WS[0];
+  const workspaceId = id ?? '';
+  const [openFile, setOpenFile] = useState<string | null>(null);
   return (
     <div style={{ height: '100%', display: 'flex', background: 'var(--bg)' }}>
       <DeskRail />
@@ -144,52 +131,11 @@ export function DesktopIDE() {
           }}
         >
           <span className="mono" style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>
-            {ws.id}
+            {workspaceId}
           </span>
-          <HIcon name="search" size={15} color="var(--faint)" />
-          <HIcon name="plus" size={16} color="var(--faint)" />
         </div>
-        <div style={{ flex: 1, padding: 6, overflow: 'auto' }}>
-          {DTREE.map((t, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                height: 29,
-                padding: `0 8px 0 ${8 + t.d * 16}px`,
-                borderRadius: 7,
-                background: t.cur ? 'var(--accent-soft)' : 'transparent',
-              }}
-            >
-              {t.ic === 'folder' ? (
-                <HIcon name={t.open ? 'chevD' : 'chevR'} size={11} color="var(--faint)" />
-              ) : (
-                <span style={{ width: 11 }} />
-              )}
-              <HIcon name={t.ic} size={14} color={t.cur ? 'var(--accent-text)' : 'var(--muted)'} />
-              <span
-                className="mono"
-                style={{
-                  fontSize: 12.5,
-                  fontWeight: t.cur ? 600 : 500,
-                  color: t.cur ? 'var(--text)' : 'var(--text-2)',
-                  flex: 1,
-                }}
-              >
-                {t.n}
-              </span>
-              {t.badge && (
-                <span
-                  className="mono"
-                  style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--accent-text)' }}
-                >
-                  {t.badge}
-                </span>
-              )}
-            </div>
-          ))}
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <FileTree workspaceId={workspaceId} currentPath={openFile} onOpen={setOpenFile} />
         </div>
       </div>
       {/* editor + terminal */}
@@ -208,7 +154,7 @@ export function DesktopIDE() {
         >
           <span className="chip chip-sm">
             <HIcon name="branch" size={12} color="var(--muted)" />
-            {ws.branch}
+            main
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <StatusDot on live />
@@ -224,61 +170,8 @@ export function DesktopIDE() {
             Run
           </button>
         </div>
-        {/* tabs */}
-        <div
-          style={{
-            height: 40,
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'stretch',
-            background: 'var(--surface-2)',
-            borderBottom: '1px solid var(--border)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
-              padding: '0 14px',
-              background: 'var(--surface)',
-              borderRight: '1px solid var(--border)',
-              borderTop: '2px solid var(--accent)',
-            }}
-          >
-            <HIcon name="file" size={13} color="var(--accent-text)" />
-            <span className="mono" style={{ fontSize: 12, fontWeight: 600 }}>
-              middleware.ts
-            </span>
-            <span className="dot" style={{ background: 'var(--accent)' }} />
-          </div>
-          {['server.ts', 'routes.ts'].map((f, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                padding: '0 14px',
-                borderRight: '1px solid var(--border)',
-              }}
-            >
-              <HIcon name="file" size={13} color="var(--faint)" />
-              <span className="mono" style={{ fontSize: 12, color: 'var(--muted)' }}>
-                {f}
-              </span>
-            </div>
-          ))}
-          <div style={{ flex: 1 }} />
-          <div style={{ display: 'flex', alignItems: 'center', padding: '0 14px' }}>
-            <span className="chip chip-sm chip-accent">
-              <HIcon name="command" size={12} color="var(--accent-text)" />
-              ⌘K · edit with AI
-            </span>
-          </div>
-        </div>
-        <div style={{ flex: 1, minHeight: 0, padding: '16px 20px', overflow: 'auto' }}>
-          <Code lines={FILE_MIDDLEWARE} />
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <WorkspaceFileEditor workspaceId={workspaceId} path={openFile} />
         </div>
         <DTerm />
       </div>

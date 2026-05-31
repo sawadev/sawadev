@@ -2,6 +2,7 @@ import type { SystemVersion } from '@sawadev/shared';
 import { Hono } from 'hono';
 import { requireSession } from './auth/middleware';
 import { authRoutes } from './auth/routes';
+import { fileRoutes } from './files/routes';
 import { workspaceRoutes } from './workspaces/routes';
 
 /** Version courante de l'instance (injectée au build/MAJ ; statique au M0). */
@@ -18,6 +19,7 @@ export function createApp() {
   app.use('/api/*', requireSession);
 
   app.route('/api/workspaces', workspaceRoutes());
+  app.route('/api/workspaces', fileRoutes());
 
   app.get('/api/system/version', (c) => {
     const body: SystemVersion = {

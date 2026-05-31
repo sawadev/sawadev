@@ -1,6 +1,7 @@
 import type { CreateWorkspaceRequest } from '@sawadev/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAuthState, login, loginWithPasskey, logout, registerPasskey, setup } from './auth';
+import { listFiles, readFile, writeFile } from './files';
 import {
   createWorkspace,
   deleteWorkspace,
@@ -82,4 +83,28 @@ export function useStopWorkspace() {
 export function useDeleteWorkspace() {
   const invalidate = useInvalidateWorkspaces();
   return useMutation({ mutationFn: (id: string) => deleteWorkspace(id), onSuccess: invalidate });
+}
+
+// ── Fichiers ─────────────────────────────────────────────────────────────────
+
+export function useFiles(workspaceId: string, path: string) {
+  return useQuery({
+    queryKey: ['files', workspaceId, path],
+    queryFn: () => listFiles(workspaceId, path),
+  });
+}
+
+export function useFileContent(workspaceId: string, path: string | null) {
+  return useQuery({
+    queryKey: ['file', workspaceId, path],
+    queryFn: () => readFile(workspaceId, path as string),
+    enabled: path !== null,
+  });
+}
+
+export function useSaveFile(workspaceId: string) {
+  return useMutation({
+    mutationFn: ({ path, content }: { path: string; content: string }) =>
+      writeFile(workspaceId, path, content),
+  });
 }

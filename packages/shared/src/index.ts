@@ -1,4 +1,5 @@
 export type { Channel, SystemVersion } from './system';
+export type { FileContent, FileNode, MoveRequest } from './files';
 export type {
   CreateWorkspaceRequest,
   Workspace,
