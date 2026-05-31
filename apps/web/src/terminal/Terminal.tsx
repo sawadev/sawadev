@@ -4,17 +4,23 @@ import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef } from 'react';
 import { useUI } from '../context';
 
-/** Construit l'URL WebSocket du terminal (proxifiée par Vite en dev). */
-function wsUrl(workspaceId: string): string {
+/** Construit l'URL WebSocket terminal ou agent (proxifiée par Vite en dev). */
+function wsUrl(workspaceId: string, kind: 'terminal' | 'agent'): string {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${proto}://${location.host}/ws/terminal/${encodeURIComponent(workspaceId)}`;
+  return `${proto}://${location.host}/ws/${kind}/${encodeURIComponent(workspaceId)}`;
 }
 
 const DARK = { background: '#16161c', foreground: '#dcdcd4', cursor: '#dcdcd4' };
 const LIGHT = { background: '#ffffff', foreground: '#1d1d22', cursor: '#1d1d22' };
 
 /** Terminal interactif : docker exec TTY via WebSocket ↔ xterm.js. */
-export function WorkspaceTerminal({ workspaceId }: { workspaceId: string }) {
+export function WorkspaceTerminal({
+  workspaceId,
+  kind = 'terminal',
+}: {
+  workspaceId: string;
+  kind?: 'terminal' | 'agent';
+}) {
   const host = useRef<HTMLDivElement>(null);
   const { theme } = useUI();
 
@@ -31,7 +37,7 @@ export function WorkspaceTerminal({ workspaceId }: { workspaceId: string }) {
     term.open(host.current);
     fit.fit();
 
-    const ws = new WebSocket(wsUrl(workspaceId));
+    const ws = new WebSocket(wsUrl(workspaceId, kind));
 
     const sendResize = () => {
       if (ws.readyState === WebSocket.OPEN) {
@@ -65,7 +71,7 @@ export function WorkspaceTerminal({ workspaceId }: { workspaceId: string }) {
       ws.close();
       term.dispose();
     };
-  }, [workspaceId, theme]);
+  }, [workspaceId, theme, kind]);
 
   return (
     <div

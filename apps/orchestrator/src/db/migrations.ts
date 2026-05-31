@@ -78,4 +78,16 @@ export const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    id: 4,
+    name: 'api_keys',
+    sql: /* sql */ `
+      CREATE TABLE api_keys (
+        provider   TEXT PRIMARY KEY,
+        ciphertext BLOB NOT NULL,
+        iv         BLOB NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+    `,
+  },
 ];

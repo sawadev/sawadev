@@ -1,8 +1,10 @@
 import type { CreateWorkspaceRequest } from '@sawadev/shared';
+import type { KeyProvider } from '@sawadev/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAuthState, login, loginWithPasskey, logout, registerPasskey, setup } from './auth';
 import { listFiles, readFile, writeFile } from './files';
 import { addPort, listPorts, removePort } from './ports';
+import { deleteKey, getVersion, listKeys, setKey, startUpdate } from './settings';
 import {
   createWorkspace,
   deleteWorkspace,
@@ -130,4 +132,37 @@ export function useRemovePort(workspaceId: string) {
     mutationFn: (port: number) => removePort(workspaceId, port),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ports', workspaceId] }),
   });
+}
+
+// ── Réglages : clés API + système ────────────────────────────────────────────
+
+const KEYS_KEY = ['settings', 'keys'] as const;
+
+export function useVersion() {
+  return useQuery({ queryKey: ['system', 'version'], queryFn: getVersion });
+}
+
+export function useApiKeys() {
+  return useQuery({ queryKey: KEYS_KEY, queryFn: listKeys });
+}
+
+export function useSetApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ provider, key }: { provider: KeyProvider; key: string }) =>
+      setKey(provider, key),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS_KEY }),
+  });
+}
+
+export function useDeleteApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (provider: KeyProvider) => deleteKey(provider),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS_KEY }),
+  });
+}
+
+export function useStartUpdate() {
+  return useMutation({ mutationFn: startUpdate });
 }

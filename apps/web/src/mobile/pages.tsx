@@ -1,30 +1,34 @@
-import { useEffect, useRef, useState } from 'react';
+import type { KeyProvider } from '@sawadev/shared';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import {
+  useApiKeys,
   useAuthState,
   useCreateWorkspace,
+  useDeleteApiKey,
   useDeleteWorkspace,
   useLogin,
   useLoginWithPasskey,
   useLogout,
   useRegisterPasskey,
+  useSetApiKey,
   useSetup,
   useStartWorkspace,
   useStopWorkspace,
+  useVersion,
   useWorkspaces,
 } from '../api/hooks';
 import { useUI } from '../context';
-import { ACCENTS, BOTPAD, SEED_MSGS, TOPPAD, WS, buildAgentRun } from '../data';
+import { ACCENTS, BOTPAD, TOPPAD, WS } from '../data';
 import { FileTree } from '../editor/FileTree';
 import { WorkspaceFileEditor } from '../editor/WorkspaceFileEditor';
 import { HIcon } from '../icons';
 import { WorkspacePreview } from '../preview/WorkspacePreview';
+import { PROVIDER_LABEL } from '../providers';
 import { WorkspaceTerminal } from '../terminal/Terminal';
-import type { Msg } from '../types';
 import { Logo, StatusDot, UserMark } from '../ui';
 import { stackLabel, workspaceIcon } from '../workspace-display';
-import { AIPane } from './panes';
 
 /** Traduit une erreur d'API en message lisible pour l'écran de login. */
 function authErrorMessage(err: unknown): string {
@@ -349,29 +353,9 @@ export function MobileIDE() {
 
   const [openFile, setOpenFile] = useState<string | null>(null);
   const [tab, setTab] = useState('ai');
-  const [msgs, setMsgs] = useState<Msg[]>(SEED_MSGS);
-  const [running, setRunning] = useState(false);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
-
-  const send = (prompt: string) => {
-    setTab('ai');
-    setMsgs((m) => [...m, { role: 'user', text: prompt }]);
-    setRunning(true);
-    const steps = buildAgentRun(prompt);
-    let t = 0;
-    steps.forEach((s, i) => {
-      t += s.delay;
-      const tid = setTimeout(() => {
-        setMsgs((m) => [...m, s.msg]);
-        if (i === steps.length - 1) setRunning(false);
-      }, t);
-      timers.current.push(tid);
-    });
-  };
 
   const pane: Record<string, JSX.Element> = {
-    ai: <AIPane msgs={msgs} running={running} onSend={send} />,
+    ai: <WorkspaceTerminal workspaceId={workspaceId} kind="agent" />,
     files: (
       <FileTree
         workspaceId={workspaceId}
@@ -546,17 +530,20 @@ export function MobileSettings() {
   const nav = useNavigate();
   const { theme, toggleTheme, accent, setAccent } = useUI();
   const { data: authState } = useAuthState();
+  const { data: keys = [] } = useApiKeys();
+  const { data: version } = useVersion();
   const logoutM = useLogout();
   const registerPasskeyM = useRegisterPasskey();
-  const keys: [string, string, boolean][] = [
-    ['Anthropic · Claude Code', 'sk-ant-••••4f2a', true],
-    ['OpenAI · Codex CLI', 'sk-••••9c10', true],
-    ['Cursor CLI', 'no key set', false],
-  ];
+  const setKeyM = useSetApiKey();
+  const deleteKeyM = useDeleteApiKey();
+  const addKey = (provider: KeyProvider) => {
+    const key = window.prompt(`Paste your ${PROVIDER_LABEL[provider]} API key`);
+    if (key?.trim()) setKeyM.mutate({ provider, key: key.trim() });
+  };
   const server: [string, string, string][] = [
     ['shield', 'Security', 'Password, passkeys, sessions'],
-    ['globe', 'Domain & DNS', 'sawadev.io · 3 subdomains'],
-    ['cpu', 'Resources', '6 of 8 vCPU in use'],
+    ['globe', 'Channel', `${version?.channel ?? 'stable'}`],
+    ['cpu', 'Version', `current ${version?.current ?? '—'}`],
   ];
   return (
     <div
@@ -652,9 +639,9 @@ export function MobileSettings() {
           AI AGENTS & API KEYS
         </div>
         <div className="card" style={{ overflow: 'hidden' }}>
-          {keys.map((r, i) => (
+          {keys.map((k, i) => (
             <div
-              key={i}
+              key={k.provider}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -677,34 +664,32 @@ export function MobileSettings() {
                 <HIcon name="sparkleSm" size={17} color="var(--muted)" />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{r[0]}</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{PROVIDER_LABEL[k.provider]}</div>
                 <div
                   className="mono"
                   style={{
                     fontSize: 11,
-                    color: r[2] ? 'var(--text-2)' : 'var(--faint)',
+                    color: k.connected ? 'var(--text-2)' : 'var(--faint)',
                     marginTop: 2,
                   }}
                 >
-                  {r[1]}
+                  {k.connected ? 'key set · encrypted' : 'no key set'}
                 </div>
               </div>
-              {r[2] ? (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: 'var(--good)',
-                  }}
+              {k.connected ? (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => deleteKeyM.mutate(k.provider)}
                 >
-                  <StatusDot on />
-                  connected
-                </div>
+                  <HIcon name="trash" size={13} color="var(--danger)" />
+                </button>
               ) : (
-                <button className="btn btn-outline btn-sm">
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => addKey(k.provider)}
+                >
                   <HIcon name="key" size={13} color="var(--text)" />
                   Add
                 </button>

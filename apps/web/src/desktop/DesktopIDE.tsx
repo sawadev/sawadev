@@ -3,7 +3,6 @@ import { useParams } from 'react-router-dom';
 import { FileTree } from '../editor/FileTree';
 import { WorkspaceFileEditor } from '../editor/WorkspaceFileEditor';
 import { HIcon } from '../icons';
-import { AgentText, Bubble, ToolCard } from '../mobile/panes';
 import { WorkspacePreview } from '../preview/WorkspacePreview';
 import { WorkspaceTerminal } from '../terminal/Terminal';
 import { AIMark, StatusDot } from '../ui';
@@ -158,76 +157,9 @@ export function DesktopIDE() {
           </span>
           <HIcon name="history" size={16} color="var(--faint)" />
         </div>
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-            padding: 16,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 13,
-          }}
-        >
-          <Bubble>Add JWT auth middleware and protect the /orders routes</Bubble>
-          <AgentText>I'll verify the bearer token, then guard the orders router.</AgentText>
-          <ToolCard
-            m={{
-              role: 'tool',
-              kind: 'cmd',
-              icon: 'terminal',
-              title: 'Ran command',
-              meta: 'npm i jsonwebtoken',
-              body: 'out',
-            }}
-          />
-          <ToolCard
-            m={{
-              role: 'tool',
-              kind: 'edit',
-              icon: 'diff',
-              title: 'Edited',
-              meta: 'auth/middleware.ts',
-              body: 'diff',
-              approve: true,
-            }}
-          />
-          <AgentText muted>Done — 14 tests pass. Want refresh-token rotation too?</AgentText>
-        </div>
-        <div
-          style={{
-            flexShrink: 0,
-            padding: 14,
-            borderTop: '1px solid var(--border)',
-            background: 'var(--surface)',
-          }}
-        >
-          <div
-            className="field"
-            style={{
-              height: 'auto',
-              minHeight: 52,
-              alignItems: 'flex-start',
-              padding: 12,
-              flexDirection: 'column',
-              gap: 12,
-            }}
-          >
-            <span className="ph" style={{ fontSize: 14 }}>
-              Ask Claude Code to build, refactor, or debug…
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-              <HIcon name="attach" size={17} color="var(--faint)" />
-              <span className="chip chip-sm">
-                <HIcon name="file" size={12} color="var(--muted)" />3 files
-              </span>
-              <div style={{ flex: 1 }} />
-              <button className="btn btn-primary btn-sm">
-                <HIcon name="send" size={14} color="var(--on-accent)" />
-                Run
-              </button>
-            </div>
-          </div>
+        <div style={{ flex: 1, minHeight: 0, background: 'var(--term-bg)' }}>
+          {/* L'agent CLI choisi tourne dans cette session (clé injectée par env). */}
+          <WorkspaceTerminal workspaceId={workspaceId} kind="agent" />
         </div>
       </div>
     </div>

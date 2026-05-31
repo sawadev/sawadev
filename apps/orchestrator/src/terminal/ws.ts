@@ -1,50 +1,81 @@
+import type { KeyProvider } from '@sawadev/shared';
 import type { ServerWebSocket } from 'bun';
 import type { Exec } from 'dockerode';
 import { validateSessionFromCookieHeader } from '../auth/sessions';
+import { PROVIDER_ENV, getDecryptedKey } from '../secrets/keys';
 import { getManagedContainer } from '../workspaces/docker';
 import { type ExecAttachment, attachExec } from './exec-attach';
 
-/** Données attachées à chaque connexion WebSocket terminal. */
+/** Données attachées à chaque connexion WebSocket (terminal ou agent). */
 export interface TerminalData {
   workspaceId: string;
+  cmd: string[];
+  /** Variables d'env injectées à l'exec (ex. clé API agent). Jamais loggées. */
+  env: string[];
   exec?: Exec;
   attachment?: ExecAttachment;
-  /** Saisies reçues avant que l'attache async soit prête (évite leur perte). */
   pendingInput: string[];
 }
 
-/** Shell lancé dans le workspace : bash si présent, sinon sh. */
+/** Shell interactif : bash si présent, sinon sh. */
 const SHELL = [
   '/bin/sh',
   '-lc',
   'if command -v bash >/dev/null 2>&1; then exec bash; else exec sh; fi',
 ];
 
-/** Messages client -> serveur. */
 type ClientMsg = { type: 'input'; data: string } | { type: 'resize'; cols: number; rows: number };
 
-const PREFIX = '/ws/terminal/';
+const TERMINAL_PREFIX = '/ws/terminal/';
+const AGENT_PREFIX = '/ws/agent/';
+
+/** Construit l'exec d'une session agent : injecte la clé du fournisseur choisi. */
+function agentSession(provider: KeyProvider): { cmd: string[]; env: string[] } {
+  const env: string[] = [];
+  const key = getDecryptedKey(provider);
+  if (key) env.push(`${PROVIDER_ENV[provider]}=${key}`);
+  // Commande de l'agent configurable ; à défaut, un shell (l'agent peut être lancé à la main).
+  const agentCmd = Bun.env.AGENT_CMD;
+  const cmd = agentCmd ? ['/bin/sh', '-lc', agentCmd] : SHELL;
+  return { cmd, env };
+}
+
+function isProvider(p: string): p is KeyProvider {
+  return p === 'anthropic' || p === 'openai' || p === 'cursor';
+}
 
 /**
- * Tente l'upgrade WebSocket d'une requête /ws/terminal/:id.
- * Vérifie la session AVANT toute ouverture (PLAN §8). Renvoie une Response
- * d'erreur si la requête concerne ce endpoint mais échoue, ou null si la
- * requête n'est pas un endpoint terminal (à router ailleurs).
+ * Tente l'upgrade d'un WebSocket terminal **ou** agent. Vérifie la session
+ * avant ouverture (PLAN §8). Renvoie null si le chemin n'est pas un WS géré.
  */
-export function tryUpgradeTerminal(
+export function tryUpgradeWs(
   req: Request,
   server: { upgrade: (req: Request, opts: { data: TerminalData }) => boolean },
 ): Response | null | undefined {
   const url = new URL(req.url);
-  if (!url.pathname.startsWith(PREFIX)) return null;
+  const isTerminal = url.pathname.startsWith(TERMINAL_PREFIX);
+  const isAgent = url.pathname.startsWith(AGENT_PREFIX);
+  if (!isTerminal && !isAgent) return null;
 
-  const session = validateSessionFromCookieHeader(req.headers.get('cookie'));
-  if (!session) return new Response('unauthorized', { status: 401 });
+  if (!validateSessionFromCookieHeader(req.headers.get('cookie'))) {
+    return new Response('unauthorized', { status: 401 });
+  }
 
-  const workspaceId = decodeURIComponent(url.pathname.slice(PREFIX.length));
+  const prefix = isTerminal ? TERMINAL_PREFIX : AGENT_PREFIX;
+  const workspaceId = decodeURIComponent(url.pathname.slice(prefix.length));
   if (!workspaceId) return new Response('bad_request', { status: 400 });
 
-  const upgraded = server.upgrade(req, { data: { workspaceId, pendingInput: [] } });
+  let session: { cmd: string[]; env: string[] };
+  if (isAgent) {
+    const providerParam = url.searchParams.get('provider') ?? 'anthropic';
+    if (!isProvider(providerParam)) return new Response('unknown_provider', { status: 400 });
+    session = agentSession(providerParam);
+  } else {
+    session = { cmd: SHELL, env: [] };
+  }
+
+  const data: TerminalData = { workspaceId, ...session, pendingInput: [] };
+  const upgraded = server.upgrade(req, { data });
   return upgraded ? undefined : new Response('upgrade_failed', { status: 426 });
 }
 
@@ -52,7 +83,7 @@ function send(ws: ServerWebSocket<TerminalData>, msg: object): void {
   ws.send(JSON.stringify(msg));
 }
 
-/** Handlers WebSocket Bun pour le terminal. */
+/** Handlers WebSocket Bun partagés terminal/agent. */
 export const terminalWebSocket = {
   async open(ws: ServerWebSocket<TerminalData>) {
     const container = await getManagedContainer(ws.data.workspaceId);
@@ -63,7 +94,8 @@ export const terminalWebSocket = {
     }
     try {
       const exec = await container.exec({
-        Cmd: SHELL,
+        Cmd: ws.data.cmd,
+        Env: ws.data.env,
         AttachStdin: true,
         AttachStdout: true,
         AttachStderr: true,
@@ -71,7 +103,6 @@ export const terminalWebSocket = {
         WorkingDir: '/workspace',
       });
       ws.data.exec = exec;
-      // Attache native Bun (dockerode hijack inopérant sous Bun).
       const attachment = await attachExec(exec.id, {
         onData: (chunk) => send(ws, { type: 'output', data: chunk }),
         onClose: () => {
@@ -80,7 +111,6 @@ export const terminalWebSocket = {
         },
       });
       ws.data.attachment = attachment;
-      // Rejoue les saisies arrivées pendant l'attache.
       for (const data of ws.data.pendingInput) attachment.write(data);
       ws.data.pendingInput = [];
     } catch {

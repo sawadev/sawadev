@@ -1,22 +1,28 @@
+import type { KeyProvider } from '@sawadev/shared';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import {
+  useApiKeys,
   useAuthState,
   useCreateWorkspace,
+  useDeleteApiKey,
   useDeleteWorkspace,
   useLogin,
   useLoginWithPasskey,
   useLogout,
   useRegisterPasskey,
+  useSetApiKey,
   useSetup,
   useStartWorkspace,
   useStopWorkspace,
+  useVersion,
   useWorkspaces,
 } from '../api/hooks';
 import { useUI } from '../context';
 import { ACCENTS } from '../data';
 import { HIcon } from '../icons';
+import { PROVIDER_LABEL } from '../providers';
 import { Logo, StatusDot } from '../ui';
 import { stackLabel, workspaceIcon } from '../workspace-display';
 import { DeskFrame } from './DesktopShell';
@@ -319,19 +325,22 @@ export function DesktopSettings() {
   const nav = useNavigate();
   const { theme, toggleTheme, accent, setAccent } = useUI();
   const { data: authState } = useAuthState();
+  const { data: keys = [] } = useApiKeys();
+  const { data: version } = useVersion();
   const logoutM = useLogout();
   const registerPasskeyM = useRegisterPasskey();
+  const setKeyM = useSetApiKey();
+  const deleteKeyM = useDeleteApiKey();
   const doLogout = () => logoutM.mutate(undefined, { onSuccess: () => nav('/login') });
   const doRegisterPasskey = () => registerPasskeyM.mutate(undefined);
-  const keys: [string, string, boolean][] = [
-    ['Anthropic · Claude Code', 'sk-ant-••••4f2a', true],
-    ['OpenAI · Codex CLI', 'sk-••••9c10', true],
-    ['Cursor CLI', 'no key set', false],
-  ];
+  const addKey = (provider: (typeof keys)[number]['provider']) => {
+    const key = window.prompt(`Paste your ${PROVIDER_LABEL[provider]} API key`);
+    if (key?.trim()) setKeyM.mutate({ provider, key: key.trim() });
+  };
   const server: [string, string, string][] = [
     ['shield', 'Security', 'Password, passkeys, sessions'],
-    ['globe', 'Domain & DNS', 'sawadev.io · 3 subdomains'],
-    ['cpu', 'Resources', '6 of 8 vCPU in use'],
+    ['globe', 'Domain & DNS', `${version?.channel ?? 'stable'} channel`],
+    ['cpu', 'Version', `current ${version?.current ?? '—'}`],
   ];
   return (
     <DeskFrame>
@@ -410,9 +419,9 @@ export function DesktopSettings() {
           AI AGENTS & API KEYS
         </div>
         <div className="card" style={{ overflow: 'hidden' }}>
-          {keys.map((r, i) => (
+          {keys.map((k, i) => (
             <div
-              key={i}
+              key={k.provider}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -435,34 +444,33 @@ export function DesktopSettings() {
                 <HIcon name="sparkleSm" size={17} color="var(--muted)" />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{r[0]}</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{PROVIDER_LABEL[k.provider]}</div>
                 <div
                   className="mono"
                   style={{
                     fontSize: 11,
-                    color: r[2] ? 'var(--text-2)' : 'var(--faint)',
+                    color: k.connected ? 'var(--text-2)' : 'var(--faint)',
                     marginTop: 2,
                   }}
                 >
-                  {r[1]}
+                  {k.connected ? 'key set · encrypted' : 'no key set'}
                 </div>
               </div>
-              {r[2] ? (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: 'var(--good)',
-                  }}
+              {k.connected ? (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => deleteKeyM.mutate(k.provider)}
                 >
-                  <StatusDot on />
-                  connected
-                </div>
+                  <HIcon name="trash" size={13} color="var(--danger)" />
+                  Remove
+                </button>
               ) : (
-                <button className="btn btn-outline btn-sm">
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => addKey(k.provider)}
+                >
                   <HIcon name="key" size={13} color="var(--text)" />
                   Add
                 </button>
