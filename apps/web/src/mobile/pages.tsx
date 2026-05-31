@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ApiError } from '../api/client';
+import {
+  useAuthState,
+  useLogin,
+  useLoginWithPasskey,
+  useLogout,
+  useRegisterPasskey,
+  useSetup,
+} from '../api/hooks';
 import { useUI } from '../context';
 import { ACCENTS, BOTPAD, SEED_MSGS, TOPPAD, WS, buildAgentRun } from '../data';
 import { HIcon } from '../icons';
@@ -7,14 +16,44 @@ import type { Msg } from '../types';
 import { Logo, StatusDot, UserMark } from '../ui';
 import { AIPane, EditorPane, FilesPane, PreviewPane, TerminalPane } from './panes';
 
+/** Traduit une erreur d'API en message lisible pour l'écran de login. */
+function authErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 429) return `Trop d'essais. Réessayez dans ${err.retryAfter ?? 60}s.`;
+    if (err.message === 'invalid_credentials') return 'Mot de passe incorrect.';
+    if (err.message === 'weak_password') return 'Mot de passe trop court (8 caractères min).';
+  }
+  return 'Échec de la connexion.';
+}
+
 // ── Login ────────────────────────────────────────────────────────
 export function MobileLogin() {
   const nav = useNavigate();
-  const [auth, setAuth] = useState(false);
-  const go = () => {
-    setAuth(true);
-    setTimeout(() => nav('/workspaces'), 900);
+  const { data: state } = useAuthState();
+  const setupMode = state?.setupDone === false;
+  const canPasskey = state?.hasPasskey === true;
+
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const loginM = useLogin();
+  const setupM = useSetup();
+  const passkeyM = useLoginWithPasskey();
+  const busy = loginM.isPending || setupM.isPending || passkeyM.isPending;
+
+  const onSuccess = () => nav('/workspaces');
+
+  const submitPassword = () => {
+    setError(null);
+    const m = setupMode ? setupM : loginM;
+    m.mutate(password, { onSuccess, onError: (e) => setError(authErrorMessage(e)) });
   };
+
+  const submitPasskey = () => {
+    setError(null);
+    passkeyM.mutate(undefined, { onSuccess, onError: (e) => setError(authErrorMessage(e)) });
+  };
+
   return (
     <div
       style={{
@@ -38,67 +77,98 @@ export function MobileLogin() {
           <Logo size={28} />
           <div style={{ fontSize: 15, color: 'var(--muted)' }}>your dev machine, in the cloud</div>
         </div>
-        <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5 }}>Welcome back</div>
+        <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5 }}>
+          {setupMode ? 'Set up sawadev' : 'Welcome back'}
+        </div>
         <div style={{ fontSize: 14.5, color: 'var(--muted)', marginTop: 4, marginBottom: 32 }}>
-          Sign in to your sawadev server
+          {setupMode ? 'Choose your admin password' : 'Sign in to your sawadev server'}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-          <div
-            style={{
-              width: 70,
-              height: 70,
-              borderRadius: 20,
-              background: 'var(--accent-soft)',
-              border: '1.5px solid var(--accent-line)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'transform .3s var(--ease)',
-              transform: auth ? 'scale(1.08)' : 'none',
-            }}
-          >
-            <HIcon name={auth ? 'check' : 'finger'} size={32} color="var(--accent-text)" sw={1.6} />
-          </div>
-          <button
-            className="btn btn-primary"
-            style={{ width: '100%', height: 52, fontSize: 15.5 }}
-            onClick={go}
-          >
-            {auth ? (
-              'Authenticating…'
-            ) : (
-              <>
-                <HIcon name="finger" size={19} color="var(--on-accent)" />
-                Sign in with passkey
-              </>
-            )}
-          </button>
-          <div style={{ fontSize: 12.5, color: 'var(--faint)' }}>
-            Face ID · Touch ID · security key
-          </div>
-        </div>
+        {!setupMode && canPasskey && (
+          <>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}
+            >
+              <div
+                style={{
+                  width: 70,
+                  height: 70,
+                  borderRadius: 20,
+                  background: 'var(--accent-soft)',
+                  border: '1.5px solid var(--accent-line)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <HIcon name="finger" size={32} color="var(--accent-text)" sw={1.6} />
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ width: '100%', height: 52, fontSize: 15.5 }}
+                onClick={submitPasskey}
+                disabled={busy}
+              >
+                {passkeyM.isPending ? (
+                  'Authenticating…'
+                ) : (
+                  <>
+                    <HIcon name="finger" size={19} color="var(--on-accent)" />
+                    Sign in with passkey
+                  </>
+                )}
+              </button>
+              <div style={{ fontSize: 12.5, color: 'var(--faint)' }}>
+                Face ID · Touch ID · security key
+              </div>
+            </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '26px 0 20px' }}>
-          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-          <span style={{ fontSize: 12, color: 'var(--faint)' }}>or use password</span>
-          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-        </div>
-        <div className="field">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '26px 0 20px' }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              <span style={{ fontSize: 12, color: 'var(--faint)' }}>or use password</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            </div>
+          </>
+        )}
+
+        <label className="field">
           <HIcon name="lock" size={16} color="var(--faint)" />
-          <span className="ph">Password</span>
-        </div>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && password) submitPassword();
+            }}
+            placeholder={setupMode ? 'New password (8+ chars)' : 'Password'}
+            autoComplete={setupMode ? 'new-password' : 'current-password'}
+            style={{
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              flex: 1,
+              fontSize: 15,
+              color: 'var(--text)',
+            }}
+          />
+        </label>
+        {error && (
+          <div style={{ color: 'var(--danger, #e5484d)', fontSize: 13, marginTop: 10 }}>
+            {error}
+          </div>
+        )}
         <button
+          type="button"
           className="btn btn-outline"
           style={{ width: '100%', marginTop: 12 }}
-          onClick={() => nav('/workspaces')}
+          onClick={submitPassword}
+          disabled={busy || !password}
         >
-          Continue
+          {setupMode ? 'Create account' : 'Continue'}
         </button>
       </div>
-      <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--faint)' }}>
-        self-hosted · v2.4.0
-      </div>
+      <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--faint)' }}>self-hosted</div>
     </div>
   );
 }
@@ -425,6 +495,9 @@ export function MobileIDE() {
 export function MobileSettings() {
   const nav = useNavigate();
   const { theme, toggleTheme, accent, setAccent } = useUI();
+  const { data: authState } = useAuthState();
+  const logoutM = useLogout();
+  const registerPasskeyM = useRegisterPasskey();
   const keys: [string, string, boolean][] = [
     ['Anthropic · Claude Code', 'sk-ant-••••4f2a', true],
     ['OpenAI · Codex CLI', 'sk-••••9c10', true],
@@ -636,15 +709,31 @@ export function MobileSettings() {
         </div>
 
         <button
+          type="button"
+          className="btn btn-outline"
+          style={{ width: '100%', marginTop: 26, height: 48 }}
+          onClick={() => registerPasskeyM.mutate(undefined)}
+          disabled={registerPasskeyM.isPending}
+        >
+          <HIcon name="finger" size={17} color="var(--text)" />
+          {authState?.hasPasskey
+            ? 'Add another passkey'
+            : registerPasskeyM.isPending
+              ? 'Registering…'
+              : 'Add a passkey'}
+        </button>
+        <button
+          type="button"
           className="btn btn-outline"
           style={{
             width: '100%',
-            marginTop: 26,
+            marginTop: 12,
             height: 48,
             color: 'var(--danger)',
             borderColor: 'var(--danger-line)',
           }}
-          onClick={() => nav('/login')}
+          onClick={() => logoutM.mutate(undefined, { onSuccess: () => nav('/login') })}
+          disabled={logoutM.isPending}
         >
           <HIcon name="logout" size={17} color="var(--danger)" />
           Log out

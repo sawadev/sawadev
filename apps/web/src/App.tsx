@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { useAuthState } from './api/hooks';
 import { UIContext, useUI } from './context';
 import { ACCENTS } from './data';
 import { DesktopIDE } from './desktop/DesktopIDE';
@@ -53,9 +54,27 @@ function useViewportScale(w: number, h: number, pad: number) {
   return scale;
 }
 
+/** Écran neutre pendant la résolution de l'état d'auth. */
+function AuthSplash() {
+  return <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)' }} />;
+}
+
+/** Garde : redirige vers /login si la session n'est pas valide. */
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { data, isLoading } = useAuthState();
+  if (isLoading) return <AuthSplash />;
+  if (!data?.authenticated) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
 // ── Page wrappers: pick the variant for the active device per route ──
 function LoginPage() {
-  return useUI().isMobile ? <MobileLogin /> : <DesktopLogin />;
+  const { isMobile } = useUI();
+  const { data, isLoading } = useAuthState();
+  if (isLoading) return <AuthSplash />;
+  // Déjà connecté : pas de raison de rester sur /login.
+  if (data?.authenticated) return <Navigate to="/workspaces" replace />;
+  return isMobile ? <MobileLogin /> : <DesktopLogin />;
 }
 function WorkspacesPage() {
   return useUI().isMobile ? <MobileDashboard /> : <DesktopWorkspaces />;
@@ -75,9 +94,30 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/workspaces" element={<WorkspacesPage />} />
-      <Route path="/workspaces/:id" element={<IDEPage />} />
-      <Route path="/settings" element={<SettingsPage />} />
+      <Route
+        path="/workspaces"
+        element={
+          <RequireAuth>
+            <WorkspacesPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/workspaces/:id"
+        element={
+          <RequireAuth>
+            <IDEPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <RequireAuth>
+            <SettingsPage />
+          </RequireAuth>
+        }
+      />
       <Route path="*" element={<Navigate to="/workspaces" replace />} />
     </Routes>
   );

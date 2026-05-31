@@ -1,19 +1,57 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ApiError } from '../api/client';
+import {
+  useAuthState,
+  useLogin,
+  useLoginWithPasskey,
+  useLogout,
+  useRegisterPasskey,
+  useSetup,
+} from '../api/hooks';
 import { useUI } from '../context';
 import { ACCENTS, WS } from '../data';
 import { HIcon } from '../icons';
 import { Logo, StatusDot } from '../ui';
 import { DeskFrame } from './DesktopShell';
 
+function authErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 429) return `Trop d'essais. Réessayez dans ${err.retryAfter ?? 60}s.`;
+    if (err.message === 'invalid_credentials') return 'Mot de passe incorrect.';
+    if (err.message === 'weak_password') return 'Mot de passe trop court (8 caractères min).';
+  }
+  return 'Échec de la connexion.';
+}
+
 // ── Login ────────────────────────────────────────────────────────
 export function DesktopLogin() {
   const nav = useNavigate();
-  const [auth, setAuth] = useState(false);
-  const go = () => {
-    setAuth(true);
-    setTimeout(() => nav('/workspaces'), 900);
+  const { data: state } = useAuthState();
+  const setupMode = state?.setupDone === false;
+  const canPasskey = state?.hasPasskey === true;
+
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const loginM = useLogin();
+  const setupM = useSetup();
+  const passkeyM = useLoginWithPasskey();
+  const busy = loginM.isPending || setupM.isPending || passkeyM.isPending;
+
+  const onSuccess = () => nav('/workspaces');
+  const submitPassword = () => {
+    setError(null);
+    (setupMode ? setupM : loginM).mutate(password, {
+      onSuccess,
+      onError: (e) => setError(authErrorMessage(e)),
+    });
   };
+  const submitPasskey = () => {
+    setError(null);
+    passkeyM.mutate(undefined, { onSuccess, onError: (e) => setError(authErrorMessage(e)) });
+  };
+
   return (
     <div
       style={{
@@ -40,65 +78,98 @@ export function DesktopLogin() {
           <Logo size={26} />
           <div style={{ fontSize: 14, color: 'var(--muted)' }}>your dev machine, in the cloud</div>
         </div>
-        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>Welcome back</div>
+        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>
+          {setupMode ? 'Set up sawadev' : 'Welcome back'}
+        </div>
         <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 4, marginBottom: 28 }}>
-          Sign in to your sawadev server
+          {setupMode ? 'Choose your admin password' : 'Sign in to your sawadev server'}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 18,
-              background: 'var(--accent-soft)',
-              border: '1.5px solid var(--accent-line)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'transform .3s var(--ease)',
-              transform: auth ? 'scale(1.08)' : 'none',
-            }}
-          >
-            <HIcon name={auth ? 'check' : 'finger'} size={28} color="var(--accent-text)" sw={1.6} />
-          </div>
-          <button
-            className="btn btn-primary"
-            style={{ width: '100%', height: 50, fontSize: 15 }}
-            onClick={go}
-          >
-            {auth ? (
-              'Authenticating…'
-            ) : (
-              <>
-                <HIcon name="finger" size={18} color="var(--on-accent)" />
-                Sign in with passkey
-              </>
-            )}
-          </button>
-          <div style={{ fontSize: 12.5, color: 'var(--faint)' }}>
-            Touch ID · Windows Hello · security key
-          </div>
-        </div>
+        {!setupMode && canPasskey && (
+          <>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}
+            >
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 18,
+                  background: 'var(--accent-soft)',
+                  border: '1.5px solid var(--accent-line)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <HIcon name="finger" size={28} color="var(--accent-text)" sw={1.6} />
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ width: '100%', height: 50, fontSize: 15 }}
+                onClick={submitPasskey}
+                disabled={busy}
+              >
+                {passkeyM.isPending ? (
+                  'Authenticating…'
+                ) : (
+                  <>
+                    <HIcon name="finger" size={18} color="var(--on-accent)" />
+                    Sign in with passkey
+                  </>
+                )}
+              </button>
+              <div style={{ fontSize: 12.5, color: 'var(--faint)' }}>
+                Touch ID · Windows Hello · security key
+              </div>
+            </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0 18px' }}>
-          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-          <span style={{ fontSize: 12, color: 'var(--faint)' }}>or use password</span>
-          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-        </div>
-        <div className="field">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0 18px' }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              <span style={{ fontSize: 12, color: 'var(--faint)' }}>or use password</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            </div>
+          </>
+        )}
+
+        <label className="field">
           <HIcon name="lock" size={16} color="var(--faint)" />
-          <span className="ph">Password</span>
-        </div>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && password) submitPassword();
+            }}
+            placeholder={setupMode ? 'New password (8+ chars)' : 'Password'}
+            autoComplete={setupMode ? 'new-password' : 'current-password'}
+            style={{
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              flex: 1,
+              fontSize: 14,
+              color: 'var(--text)',
+            }}
+          />
+        </label>
+        {error && (
+          <div style={{ color: 'var(--danger, #e5484d)', fontSize: 13, marginTop: 10 }}>
+            {error}
+          </div>
+        )}
         <button
+          type="button"
           className="btn btn-outline"
           style={{ width: '100%', marginTop: 12 }}
-          onClick={() => nav('/workspaces')}
+          onClick={submitPassword}
+          disabled={busy || !password}
         >
-          Continue
+          {setupMode ? 'Create account' : 'Continue'}
         </button>
         <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--faint)', marginTop: 24 }}>
-          self-hosted · v2.4.0
+          self-hosted
         </div>
       </div>
     </div>
@@ -201,6 +272,11 @@ export function DesktopWorkspaces() {
 export function DesktopSettings() {
   const nav = useNavigate();
   const { theme, toggleTheme, accent, setAccent } = useUI();
+  const { data: authState } = useAuthState();
+  const logoutM = useLogout();
+  const registerPasskeyM = useRegisterPasskey();
+  const doLogout = () => logoutM.mutate(undefined, { onSuccess: () => nav('/login') });
+  const doRegisterPasskey = () => registerPasskeyM.mutate(undefined);
   const keys: [string, string, boolean][] = [
     ['Anthropic · Claude Code', 'sk-ant-••••4f2a', true],
     ['OpenAI · Codex CLI', 'sk-••••9c10', true],
@@ -406,24 +482,52 @@ export function DesktopSettings() {
         >
           ACCOUNT
         </div>
-        <div
-          className="card"
-          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '15px 18px' }}
-        >
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Sign out</div>
-            <div style={{ fontSize: 12, color: 'var(--faint)', marginTop: 1 }}>
-              End this session on the current device
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '15px 18px' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Passkey</div>
+              <div style={{ fontSize: 12, color: 'var(--faint)', marginTop: 1 }}>
+                {authState?.hasPasskey
+                  ? 'A passkey is registered on this account'
+                  : 'Add a passkey for faster sign-in (Face ID, Touch ID…)'}
+              </div>
             </div>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={doRegisterPasskey}
+              disabled={registerPasskeyM.isPending}
+            >
+              <HIcon name="finger" size={14} color="var(--text)" />
+              {registerPasskeyM.isPending ? 'Registering…' : 'Add passkey'}
+            </button>
           </div>
-          <button
-            className="btn btn-outline btn-sm"
-            style={{ color: 'var(--danger)', borderColor: 'var(--danger-line)' }}
-            onClick={() => nav('/login')}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '15px 18px',
+              borderTop: '1px solid var(--border-soft)',
+            }}
           >
-            <HIcon name="logout" size={14} color="var(--danger)" />
-            Log out
-          </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Sign out</div>
+              <div style={{ fontSize: 12, color: 'var(--faint)', marginTop: 1 }}>
+                End this session on the current device
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              style={{ color: 'var(--danger)', borderColor: 'var(--danger-line)' }}
+              onClick={doLogout}
+              disabled={logoutM.isPending}
+            >
+              <HIcon name="logout" size={14} color="var(--danger)" />
+              Log out
+            </button>
+          </div>
         </div>
       </div>
     </DeskFrame>

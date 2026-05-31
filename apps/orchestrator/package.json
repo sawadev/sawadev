@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@sawadev/shared": "workspace:*",
+    "@simplewebauthn/server": "^13",
     "hono": "^4.6.0"
   },
   "devDependencies": {

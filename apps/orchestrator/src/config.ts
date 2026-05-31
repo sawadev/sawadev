@@ -1,0 +1,58 @@
+/**
+ * Configuration d'instance lue depuis l'environnement.
+ * Valeurs par défaut adaptées au dev local (macOS / Vite sur :5173).
+ */
+export interface AppConfig {
+  port: number;
+  dbPath: string;
+  /** Relying Party ID WebAuthn = domaine (sans port). 'localhost' en dev. */
+  rpID: string;
+  /** Nom affiché dans le prompt passkey. */
+  rpName: string;
+  /** Origine attendue des réponses WebAuthn (schéma + hôte + port). */
+  rpOrigin: string;
+  /** Pose le flag Secure sur le cookie de session (HTTPS uniquement). */
+  cookieSecure: boolean;
+  /** Durée de vie d'une session, en secondes. */
+  sessionTtlSec: number;
+  /** Échecs de login tolérés avant bannissement de l'IP. */
+  maxLoginFails: number;
+  /** Durée du bannissement, en secondes. */
+  banDurationSec: number;
+}
+
+function envStr(key: string, fallback: string): string {
+  const v = Bun.env[key];
+  return v && v.length > 0 ? v : fallback;
+}
+
+function envInt(key: string, fallback: number): number {
+  const v = Bun.env[key];
+  if (!v) return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+let cached: AppConfig | null = null;
+
+export function getConfig(): AppConfig {
+  if (cached) return cached;
+  const rpOrigin = envStr('RP_ORIGIN', 'http://localhost:5173');
+  cached = {
+    port: envInt('PORT', 8787),
+    dbPath: envStr('DB_PATH', './data/sawadev.db'),
+    rpID: envStr('RP_ID', 'localhost'),
+    rpName: envStr('RP_NAME', 'sawadev'),
+    rpOrigin,
+    cookieSecure: rpOrigin.startsWith('https://'),
+    sessionTtlSec: envInt('SESSION_TTL_SEC', 60 * 60 * 24 * 30),
+    maxLoginFails: envInt('MAX_LOGIN_FAILS', 5),
+    banDurationSec: envInt('BAN_DURATION_SEC', 60 * 15),
+  };
+  return cached;
+}
+
+/** Réinitialise le cache (tests). */
+export function resetConfigCache(): void {
+  cached = null;
+}
