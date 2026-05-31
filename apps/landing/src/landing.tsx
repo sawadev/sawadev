@@ -4,7 +4,7 @@ import type { Theme } from './main';
 import { AIMark, Code, FILE_MIDDLEWARE, HIcon, Logo } from './ui';
 
 /** Dépôt GitHub du projet — source unique de vérité pour tous les liens. */
-const GH = 'https://github.com/duboisqpro/sawadev';
+const GH = 'https://github.com/sawadev/sawadev';
 
 // ── small marketing atoms ────────────────────────────────────────
 function GhButton({
