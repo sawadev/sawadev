@@ -38,7 +38,7 @@
 | # | Sujet | Décision |
 |---|---|---|
 | A | **Utilisateurs** | Mono-utilisateur : 1 instance = 1 développeur. |
-| B | **Isolation** | **Docker** : l'app (orchestrateur, éditeur, reverse proxy, auth) tourne sur l'hôte ; **chaque workspace/projet tourne dans un conteneur dédié** (sécurité + reproductibilité + routage propre). |
+| B | **Isolation** | **Docker** : l'orchestrateur, le reverse proxy et l'auth tournent en conteneurs ; **chaque workspace est un *groupe* de conteneurs** (1 conteneur « dev » + n « tools ») isolé par un **réseau Docker dédié** (cf. §3 ter). |
 | C | **IA** | Agent **autonome** avec droits sur le projet (type Cursor). **BYO agent + BYO clés** : l'utilisateur vient avec son agent CLI préféré (Claude Code, Cursor CLI, Codex CLI, aider, opencode…) et ses propres clés API. |
 | D | **Éditeur** | **Maison, le plus léger possible.** Joue le rôle d'enveloppe autour de l'agent CLI (cf. §5). |
 | E | **Sécurité / exposition** | **Auto-hébergé pur** : reverse proxy local (**Caddy**, HTTPS auto via Let's Encrypt) + **auth maison forte = mot de passe (argon2) + passkeys/WebAuthn**. Pas de Tunnel ni de proxy tiers ; l'app et le proxy tournent sur le VPS. |
@@ -58,7 +58,52 @@
 
 ---
 
-## 3 ter. Authentification & durcissement
+## 3 ter. Modèle multi-conteneurs & tools
+
+Un workspace n'est **pas un seul conteneur** mais un **groupe** : un projet réel peut avoir plusieurs applis et une (ou plusieurs) base(s) de données.
+
+**Composition d'un workspace :**
+- **1 conteneur « dev » (l'ancre)** : le code (`/workspace`), le terminal, l'agent CLI. C'est lui qu'on ouvre dans l'éditeur.
+- **0..n conteneurs « tool »** : services **à état** (Postgres, MySQL, Mongo, Redis…). **Une BDD = un tool = un conteneur dédié** rattaché au workspace.
+- **0..n conteneurs « app »** *(optionnel)* : seulement si l'utilisateur veut isoler une appli dans son propre conteneur.
+
+**Apps vs tools (décision) :** par défaut, **les applis tournent comme des process dans le conteneur dev** (ex. `bun run dev` sur `:3000` et `:3001`). On ne crée des conteneurs séparés que pour les **tools à état** (les BDD surtout) ou une app qu'on veut explicitement containeriser.
+
+**Réseau dédié par workspace (mécanisme d'isolation clé) :** chaque workspace a un **bridge network** `sawadev-ws-<id>`. Tous ses conteneurs y sont attachés et se joignent **par leur nom DNS** (comme docker-compose : l'app lit `db:5432`). Bénéfices : pas de collision de noms entre workspaces, isolation inter-workspaces par défaut, et **pas besoin de port hôte pour le HTTP** (Caddy est attaché au réseau et route directement vers `sawadev-<id>-dev:<port>`).
+
+**Ports hôte (décision) :** par défaut **aucun port publié sur l'hôte** (tout le HTTP passe par Caddy via le réseau). Un port hôte n'est ouvert **que sur demande explicite** (« exposer en TCP », ex. brancher un client BDD externe), via un **pool dynamique global** alloué à la demande et enregistré en base.
+
+**Création des tools (décision — sécurité) :** **pas de socket Docker dans le conteneur dev.** Les tools sont créés par l'**orchestrateur** depuis un **catalogue managé** (postgres, redis, mysql…), ce qui garantit labels, réseau et volume corrects. _Plus tard, en opt-in par workspace :_ accès Docker brut pour les power-users (durci par `docker-socket-proxy`).
+
+**Câblage des connexions :** à l'ajout d'un tool, l'orchestrateur génère les identifiants, crée le volume, attache au réseau, écrit les infos de connexion dans **`/workspace/.sawadev/tools.env`** et les **affiche dans l'UI** (hôte, port, user/pass). Pas d'injection d'env à chaud → le conteneur dev n'est pas recréé.
+
+**Tagging & nommage (organisation) :** on tague **tout** (base de l'organisation et de la sécurité — on n'agit jamais sur un conteneur non tagué) :
+
+| Élément | Convention |
+|---|---|
+| Réseau | `sawadev-ws-<id>` |
+| Conteneur dev | `sawadev-<id>-dev` |
+| Conteneur tool | `sawadev-<id>-<tool>` (ex. `sawadev-shop-postgres`) |
+| Volume tool | `sawadev-ws-<id>-<tool>-data` |
+| Labels (sur tout) | `sawadev.managed=true`, `sawadev.workspace=<id>`, `sawadev.role=dev\|tool\|app`, `sawadev.tool=<type>` |
+
+**Cycle de vie :** start / stop / delete s'appliquent au **groupe entier** (filtre sur le label `sawadev.workspace=<id>`). La suppression d'un workspace retire ses conteneurs et son réseau ; les **volumes** (données des BDD) ne sont supprimés que **sur confirmation**.
+
+**Exemple — workspace `shop` (2 apps + Postgres + Redis) :**
+```
+réseau: sawadev-ws-shop
+├── sawadev-shop-dev        role=dev   (code, agent ; api:3000 + admin:3001 en process)
+├── sawadev-shop-postgres   role=tool  tool=postgres  vol=sawadev-ws-shop-postgres-data
+└── sawadev-shop-redis      role=tool  tool=redis     vol=sawadev-ws-shop-redis-data
+
+Caddy : shop-3000.domaine.com → sawadev-shop-dev:3000
+        shop-3001.domaine.com → sawadev-shop-dev:3001
+DNS interne : l'app joint  db:5432  et  redis:6379
+```
+
+---
+
+## 3 quater. Authentification & durcissement
 
 **Méthode retenue : mot de passe + passkeys.**
 

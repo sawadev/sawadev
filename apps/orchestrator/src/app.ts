@@ -2,6 +2,7 @@ import type { SystemVersion } from '@sawadev/shared';
 import { Hono } from 'hono';
 import { requireSession } from './auth/middleware';
 import { authRoutes } from './auth/routes';
+import { workspaceRoutes } from './workspaces/routes';
 
 /** Version courante de l'instance (injectée au build/MAJ ; statique au M0). */
 export const CURRENT_VERSION = '0.1.0';
@@ -15,6 +16,8 @@ export function createApp() {
 
   // Toute autre route /api/* exige une session valide (PLAN §8).
   app.use('/api/*', requireSession);
+
+  app.route('/api/workspaces', workspaceRoutes());
 
   app.get('/api/system/version', (c) => {
     const body: SystemVersion = {

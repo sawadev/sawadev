@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+
 /**
  * Configuration d'instance lue depuis l'environnement.
  * Valeurs par défaut adaptées au dev local (macOS / Vite sur :5173).
@@ -19,6 +21,12 @@ export interface AppConfig {
   maxLoginFails: number;
   /** Durée du bannissement, en secondes. */
   banDurationSec: number;
+  /** Image Docker par défaut des workspaces. */
+  workspaceImage: string;
+  /** Dossier hôte (absolu) contenant les volumes bind des workspaces. */
+  workspacesDir: string;
+  /** Réseau Docker auquel rattacher les workspaces. */
+  dockerNetwork: string;
 }
 
 function envStr(key: string, fallback: string): string {
@@ -48,6 +56,9 @@ export function getConfig(): AppConfig {
     sessionTtlSec: envInt('SESSION_TTL_SEC', 60 * 60 * 24 * 30),
     maxLoginFails: envInt('MAX_LOGIN_FAILS', 5),
     banDurationSec: envInt('BAN_DURATION_SEC', 60 * 15),
+    workspaceImage: envStr('WORKSPACE_IMAGE', 'node:20-bookworm-slim'),
+    workspacesDir: resolve(envStr('WORKSPACES_DIR', './data/workspaces')),
+    dockerNetwork: envStr('DOCKER_NETWORK', 'sawadev_net'),
   };
   return cached;
 }

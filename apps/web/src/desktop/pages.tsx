@@ -3,16 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import {
   useAuthState,
+  useCreateWorkspace,
+  useDeleteWorkspace,
   useLogin,
   useLoginWithPasskey,
   useLogout,
   useRegisterPasskey,
   useSetup,
+  useStartWorkspace,
+  useStopWorkspace,
+  useWorkspaces,
 } from '../api/hooks';
 import { useUI } from '../context';
-import { ACCENTS, WS } from '../data';
+import { ACCENTS } from '../data';
 import { HIcon } from '../icons';
 import { Logo, StatusDot } from '../ui';
+import { stackLabel, workspaceIcon } from '../workspace-display';
 import { DeskFrame } from './DesktopShell';
 
 function authErrorMessage(err: unknown): string {
@@ -179,6 +185,18 @@ export function DesktopLogin() {
 // ── Workspaces dashboard ─────────────────────────────────────────
 export function DesktopWorkspaces() {
   const nav = useNavigate();
+  const { data: workspaces = [], isLoading } = useWorkspaces();
+  const createM = useCreateWorkspace();
+  const startM = useStartWorkspace();
+  const stopM = useStopWorkspace();
+  const deleteM = useDeleteWorkspace();
+  const running = workspaces.filter((w) => w.status === 'running').length;
+
+  const onNew = () => {
+    const name = window.prompt('Workspace name?');
+    if (name?.trim()) createM.mutate({ name: name.trim() });
+  };
+
   return (
     <DeskFrame>
       <div style={{ maxWidth: 1040, margin: '0 auto', padding: '40px 40px 60px' }}>
@@ -186,21 +204,25 @@ export function DesktopWorkspaces() {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.6 }}>Workspaces</div>
             <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 4 }}>
-              2 of 3 running · 6 of 8 vCPU in use
+              {isLoading ? 'Loading…' : `${running} of ${workspaces.length} running`}
             </div>
           </div>
-          <button className="btn btn-primary">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onNew}
+            disabled={createM.isPending}
+          >
             <HIcon name="plus" size={17} color="var(--on-accent)" />
-            New workspace
+            {createM.isPending ? 'Creating…' : 'New workspace'}
           </button>
         </div>
 
-        <div className="field" style={{ height: 44, marginBottom: 24, maxWidth: 360 }}>
-          <HIcon name="search" size={17} color="var(--faint)" />
-          <span className="ph" style={{ fontSize: 14 }}>
-            Search workspaces…
-          </span>
-        </div>
+        {!isLoading && workspaces.length === 0 && (
+          <div style={{ fontSize: 14, color: 'var(--faint)', padding: '24px 2px' }}>
+            No workspace yet. Click “New workspace” to create one.
+          </div>
+        )}
 
         <div
           style={{
@@ -209,59 +231,83 @@ export function DesktopWorkspaces() {
             gap: 16,
           }}
         >
-          {WS.map((w, i) => (
-            <div
-              key={i}
-              className="card chip-press"
-              style={{
-                padding: 18,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 16,
-                cursor: 'pointer',
-              }}
-              onClick={() => nav(`/workspaces/${w.id}`)}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div
+          {workspaces.map((w) => {
+            const on = w.status === 'running';
+            return (
+              <div
+                key={w.id}
+                className="card"
+                style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}
+              >
+                <button
+                  type="button"
+                  onClick={() => nav(`/workspaces/${w.id}`)}
                   style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
-                    background: 'var(--elevated)',
-                    border: '1px solid var(--border-soft)',
+                    border: 'none',
+                    background: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
+                    gap: 12,
+                    textAlign: 'left',
                   }}
                 >
-                  <HIcon name={w.icon} size={21} color="var(--text-2)" />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="mono" style={{ fontSize: 15, fontWeight: 600 }}>
-                    {w.id}
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 12,
+                      background: 'var(--elevated)',
+                      border: '1px solid var(--border-soft)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <HIcon name={workspaceIcon(w.image)} size={21} color="var(--text-2)" />
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--faint)', marginTop: 2 }}>
-                    opened {w.last}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600 }}>{w.name}</div>
+                    <div
+                      className="mono"
+                      style={{ fontSize: 11.5, color: 'var(--faint)', marginTop: 2 }}
+                    >
+                      {w.id}
+                    </div>
                   </div>
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="chip chip-sm">{stackLabel(w.image)}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <StatusDot on={on} live={on} />
+                    <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
+                      {w.status}
+                    </span>
+                  </div>
+                  <div style={{ flex: 1 }} />
+                  <button
+                    type="button"
+                    className="btn btn-soft btn-sm"
+                    onClick={() => (on ? stopM.mutate(w.id) : startM.mutate(w.id))}
+                  >
+                    {on ? 'Stop' : 'Start'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-soft btn-sm"
+                    style={{ color: 'var(--danger)' }}
+                    onClick={() => {
+                      if (window.confirm(`Delete ${w.name}? This removes its data.`))
+                        deleteM.mutate(w.id);
+                    }}
+                  >
+                    <HIcon name="trash" size={14} color="var(--danger)" />
+                  </button>
                 </div>
-                <HIcon name="dotsV" size={18} color="var(--faint)" />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="chip chip-sm">{w.stack}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <StatusDot on={w.on} live={w.on} />
-                  <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
-                    {w.on ? 'running' : 'stopped'}
-                  </span>
-                </div>
-                <div style={{ flex: 1 }} />
-                <span className="mono" style={{ fontSize: 10.5, color: 'var(--faint)' }}>
-                  {w.res}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </DeskFrame>

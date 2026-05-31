@@ -50,4 +50,20 @@ export const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    id: 2,
+    name: 'workspaces',
+    sql: /* sql */ `
+      CREATE TABLE workspaces (
+        id             TEXT PRIMARY KEY,
+        name           TEXT NOT NULL,
+        image          TEXT NOT NULL,
+        container_id   TEXT,
+        volume         TEXT NOT NULL,
+        lifecycle      TEXT NOT NULL DEFAULT 'always-on',
+        created_at     INTEGER NOT NULL,
+        last_opened_at INTEGER
+      );
+    `,
+  },
 ];

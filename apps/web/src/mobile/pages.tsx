@@ -3,17 +3,23 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import {
   useAuthState,
+  useCreateWorkspace,
+  useDeleteWorkspace,
   useLogin,
   useLoginWithPasskey,
   useLogout,
   useRegisterPasskey,
   useSetup,
+  useStartWorkspace,
+  useStopWorkspace,
+  useWorkspaces,
 } from '../api/hooks';
 import { useUI } from '../context';
 import { ACCENTS, BOTPAD, SEED_MSGS, TOPPAD, WS, buildAgentRun } from '../data';
 import { HIcon } from '../icons';
 import type { Msg } from '../types';
 import { Logo, StatusDot, UserMark } from '../ui';
+import { stackLabel, workspaceIcon } from '../workspace-display';
 import { AIPane, EditorPane, FilesPane, PreviewPane, TerminalPane } from './panes';
 
 /** Traduit une erreur d'API en message lisible pour l'écran de login. */
@@ -176,6 +182,19 @@ export function MobileLogin() {
 // ── Dashboard ────────────────────────────────────────────────────
 export function MobileDashboard() {
   const nav = useNavigate();
+  const { data: workspaces = [], isLoading } = useWorkspaces();
+  const createM = useCreateWorkspace();
+  const startM = useStartWorkspace();
+  const stopM = useStopWorkspace();
+  const deleteM = useDeleteWorkspace();
+
+  const running = workspaces.filter((w) => w.status === 'running').length;
+
+  const onNew = () => {
+    const name = window.prompt('Workspace name?');
+    if (name?.trim()) createM.mutate({ name: name.trim() });
+  };
+
   return (
     <div
       style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}
@@ -185,12 +204,7 @@ export function MobileDashboard() {
           <Logo size={19} />
           <div style={{ flex: 1 }} />
           <button
-            className="btn btn-soft btn-icon"
-            style={{ width: 38, height: 38, borderRadius: 11 }}
-          >
-            <HIcon name="bell" size={18} color="var(--text-2)" />
-          </button>
-          <button
+            type="button"
             onClick={() => nav('/settings')}
             style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}
           >
@@ -200,83 +214,104 @@ export function MobileDashboard() {
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 18px 24px' }}>
         <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.6, marginBottom: 2 }}>
-          Good morning
+          Workspaces
         </div>
         <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 18 }}>
-          2 workspaces running
+          {isLoading ? 'Loading…' : `${running} of ${workspaces.length} running`}
         </div>
-        <div className="field" style={{ height: 44, marginBottom: 22 }}>
-          <HIcon name="search" size={17} color="var(--faint)" />
-          <span className="ph" style={{ fontSize: 14.5 }}>
-            Search workspaces…
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-          <span
-            style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)', letterSpacing: 0.2 }}
-          >
-            WORKSPACES
-          </span>
-        </div>
+
+        {!isLoading && workspaces.length === 0 && (
+          <div style={{ fontSize: 14, color: 'var(--faint)', padding: '24px 0' }}>
+            No workspace yet. Tap “New” to create one.
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {WS.map((w, i) => (
-            <div
-              key={i}
-              className="card chip-press"
-              style={{
-                padding: 15,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 13,
-                cursor: 'pointer',
-              }}
-              onClick={() => nav(`/workspaces/${w.id}`)}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div
+          {workspaces.map((w) => {
+            const on = w.status === 'running';
+            return (
+              <div
+                key={w.id}
+                className="card"
+                style={{ padding: 15, display: 'flex', flexDirection: 'column', gap: 13 }}
+              >
+                <button
+                  type="button"
+                  onClick={() => nav(`/workspaces/${w.id}`)}
                   style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 12,
-                    background: 'var(--elevated)',
-                    border: '1px solid var(--border-soft)',
+                    border: 'none',
+                    background: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
+                    gap: 12,
+                    textAlign: 'left',
                   }}
                 >
-                  <HIcon name={w.icon} size={20} color="var(--text-2)" />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="mono" style={{ fontSize: 15, fontWeight: 600 }}>
-                    {w.id}
+                  <div
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 12,
+                      background: 'var(--elevated)',
+                      border: '1px solid var(--border-soft)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <HIcon name={workspaceIcon(w.image)} size={20} color="var(--text-2)" />
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--faint)', marginTop: 2 }}>
-                    opened {w.last}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600 }}>{w.name}</div>
+                    <div
+                      className="mono"
+                      style={{ fontSize: 11.5, color: 'var(--faint)', marginTop: 2 }}
+                    >
+                      {w.id}
+                    </div>
                   </div>
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="chip chip-sm">{stackLabel(w.image)}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <StatusDot on={on} live={on} />
+                    <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
+                      {w.status}
+                    </span>
+                  </div>
+                  <div style={{ flex: 1 }} />
+                  <button
+                    type="button"
+                    className="btn btn-soft btn-sm"
+                    onClick={() => (on ? stopM.mutate(w.id) : startM.mutate(w.id))}
+                  >
+                    {on ? 'Stop' : 'Start'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-soft btn-sm"
+                    style={{ color: 'var(--danger)' }}
+                    onClick={() => {
+                      if (window.confirm(`Delete ${w.name}? This removes its data.`))
+                        deleteM.mutate(w.id);
+                    }}
+                  >
+                    <HIcon name="trash" size={14} color="var(--danger)" />
+                  </button>
                 </div>
-                <HIcon name="dotsV" size={18} color="var(--faint)" />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="chip chip-sm">{w.stack}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <StatusDot on={w.on} live={w.on} />
-                  <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
-                    {w.on ? 'running' : 'stopped'}
-                  </span>
-                </div>
-                <div style={{ flex: 1 }} />
-                <span className="mono" style={{ fontSize: 10.5, color: 'var(--faint)' }}>
-                  {w.res}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       <div style={{ position: 'absolute', right: 18, bottom: BOTPAD + 14 }}>
         <button
+          type="button"
           className="btn btn-primary"
+          onClick={onNew}
+          disabled={createM.isPending}
           style={{
             height: 52,
             borderRadius: 26,
@@ -285,7 +320,7 @@ export function MobileDashboard() {
           }}
         >
           <HIcon name="plus" size={19} color="var(--on-accent)" />
-          New
+          {createM.isPending ? 'Creating…' : 'New'}
         </button>
       </div>
     </div>

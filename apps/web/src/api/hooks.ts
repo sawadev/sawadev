@@ -1,7 +1,16 @@
+import type { CreateWorkspaceRequest } from '@sawadev/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAuthState, login, loginWithPasskey, logout, registerPasskey, setup } from './auth';
+import {
+  createWorkspace,
+  deleteWorkspace,
+  listWorkspaces,
+  startWorkspace,
+  stopWorkspace,
+} from './workspaces';
 
 const AUTH_KEY = ['auth', 'state'] as const;
+const WS_KEY = ['workspaces'] as const;
 
 export function useAuthState() {
   return useQuery({ queryKey: AUTH_KEY, queryFn: getAuthState });
@@ -39,4 +48,38 @@ export function useRegisterPasskey() {
 export function useLogout() {
   const invalidate = useInvalidateAuth();
   return useMutation({ mutationFn: logout, onSuccess: invalidate });
+}
+
+// ── Workspaces ───────────────────────────────────────────────────────────────
+
+export function useWorkspaces() {
+  return useQuery({ queryKey: WS_KEY, queryFn: listWorkspaces });
+}
+
+function useInvalidateWorkspaces() {
+  const qc = useQueryClient();
+  return () => qc.invalidateQueries({ queryKey: WS_KEY });
+}
+
+export function useCreateWorkspace() {
+  const invalidate = useInvalidateWorkspaces();
+  return useMutation({
+    mutationFn: (req: CreateWorkspaceRequest) => createWorkspace(req),
+    onSuccess: invalidate,
+  });
+}
+
+export function useStartWorkspace() {
+  const invalidate = useInvalidateWorkspaces();
+  return useMutation({ mutationFn: (id: string) => startWorkspace(id), onSuccess: invalidate });
+}
+
+export function useStopWorkspace() {
+  const invalidate = useInvalidateWorkspaces();
+  return useMutation({ mutationFn: (id: string) => stopWorkspace(id), onSuccess: invalidate });
+}
+
+export function useDeleteWorkspace() {
+  const invalidate = useInvalidateWorkspaces();
+  return useMutation({ mutationFn: (id: string) => deleteWorkspace(id), onSuccess: invalidate });
 }

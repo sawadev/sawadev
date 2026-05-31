@@ -131,23 +131,48 @@ CREATE TABLE sessions (
   ip          TEXT
 );
 
--- Workspaces (projets)
+-- Workspaces (projets) — un workspace est un GROUPE de conteneurs (cf. SPEC §3 ter)
 CREATE TABLE workspaces (
-  id            TEXT PRIMARY KEY,        -- slug ('storefront-api')
+  id            TEXT PRIMARY KEY,        -- slug ('shop')
   name          TEXT NOT NULL,
-  image         TEXT NOT NULL,           -- image utilisée
-  container_id  TEXT,                    -- id docker courant
-  volume        TEXT NOT NULL,           -- nom du volume / bind path
+  image         TEXT NOT NULL,           -- image du conteneur dev
+  dev_container_id TEXT,                 -- id docker du conteneur 'dev' courant
+  network       TEXT NOT NULL,           -- réseau dédié 'sawadev-ws-<id>'
+  volume        TEXT NOT NULL,           -- volume/bind du code (/workspace)
   lifecycle     TEXT NOT NULL DEFAULT 'always-on', -- 'always-on' | 'idle-stop'
   created_at    INTEGER NOT NULL,
   last_opened_at INTEGER
 );
 
--- Ports exposés / routes preview par workspace
-CREATE TABLE ports (
+-- Tools du workspace (BDD, redis…) — chacun = 1 conteneur dédié role=tool
+CREATE TABLE tools (
+  id           TEXT PRIMARY KEY,         -- 'shop:postgres'
   workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  port         INTEGER NOT NULL,
-  subdomain    TEXT NOT NULL,            -- 'storefront-3000'
+  type         TEXT NOT NULL,            -- 'postgres' | 'mysql' | 'mongo' | 'redis' | ...
+  container_id TEXT,                     -- id docker courant
+  hostname     TEXT NOT NULL,            -- nom joignable sur le réseau ('db', 'redis')
+  volume       TEXT NOT NULL,            -- 'sawadev-ws-<id>-<tool>-data'
+  secrets_iv   BLOB,                     -- identifiants générés, chiffrés AES-256-GCM
+  secrets_ct   BLOB,
+  created_at   INTEGER NOT NULL
+);
+
+-- Ports HÔTE exposés à la demande (pool dynamique global). Le HTTP passe par
+-- Caddy via le réseau et n'a PAS besoin d'entrée ici ; on n'enregistre que les
+-- ports réellement publiés sur l'hôte (ex. TCP brut vers une BDD).
+CREATE TABLE host_ports (
+  host_port    INTEGER PRIMARY KEY,      -- alloué dans le pool (ex. 18000+)
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  target       TEXT NOT NULL,            -- 'sawadev-<id>-postgres:5432'
+  proto        TEXT NOT NULL DEFAULT 'tcp',
+  created_at   INTEGER NOT NULL
+);
+
+-- Routes preview HTTP (sous-domaine -> conteneur:port, via Caddy/réseau)
+CREATE TABLE previews (
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  port         INTEGER NOT NULL,         -- port applicatif dans le conteneur dev
+  subdomain    TEXT NOT NULL,            -- 'shop-3000'
   PRIMARY KEY (workspace_id, port)
 );
 
@@ -202,10 +227,22 @@ PUT    /api/workspaces/:id/file?path=...    { content }
 POST   /api/workspaces/:id/file/move        { from, to }
 DELETE /api/workspaces/:id/file?path=...
 
-# Ports / preview
-GET    /api/workspaces/:id/ports            -> Port[]
-POST   /api/workspaces/:id/ports            { port }  -> crée la route + sous-domaine
-DELETE /api/workspaces/:id/ports/:port
+# Tools (services managés du workspace : BDD, redis…)
+GET    /api/catalog/tools                   -> ToolType[]  (catalogue dispo)
+GET    /api/workspaces/:id/tools            -> Tool[]
+POST   /api/workspaces/:id/tools            { type }  -> crée le conteneur tool (réseau+volume), renvoie infos de connexion
+POST   /api/workspaces/:id/tools/:tool/start
+POST   /api/workspaces/:id/tools/:tool/stop
+DELETE /api/workspaces/:id/tools/:tool      { removeVolume? }
+
+# Preview HTTP (sous-domaine -> conteneur:port, via Caddy/réseau, sans port hôte)
+GET    /api/workspaces/:id/previews         -> Preview[]
+POST   /api/workspaces/:id/previews         { port }  -> crée la route + sous-domaine
+DELETE /api/workspaces/:id/previews/:port
+
+# Exposition TCP sur l'hôte à la demande (pool dynamique) — ex. client BDD externe
+POST   /api/workspaces/:id/expose           { target }  -> alloue un host_port
+DELETE /api/workspaces/:id/expose/:hostPort
 
 # Clés API / réglages
 GET    /api/settings/keys                   -> [{ provider, connected }]  (jamais la clé)
@@ -239,7 +276,9 @@ apps/orchestrator/src/
 ├── config.ts           # lecture env + table config
 ├── db/                 # bun:sqlite, migrations, repositories
 ├── auth/               # password, webauthn, sessions, middleware, rate-limit
-├── workspaces/         # dockerode : cycle de vie, volumes, labels
+├── workspaces/         # dockerode : groupe de conteneurs, réseau, volumes, labels, cycle de vie
+├── tools/              # catalogue + cycle de vie des conteneurs tool (BDD, redis…)
+├── ports/              # pool de ports hôte (allocation/libération à la demande)
 ├── terminal/           # pty / docker exec ↔ ws
 ├── files/              # fs dans le conteneur (exec ou montage)
 ├── caddy/              # Caddy Admin API : routes dynamiques
@@ -256,12 +295,23 @@ apps/orchestrator/src/
 - **Middleware** : `requireSession` sur toutes les routes `/api/*` (hors `auth/*` publiques) et au `upgrade` WS. Rejet 401 sinon.
 
 ### 6.2 Workspaces (`workspaces/`)
-- `dockerode` pour `create/start/stop/remove`, `inspect` (statut), `stats` (ressources).
-- **Labels** sur chaque conteneur (`sawadev.workspace=<id>`, `sawadev.managed=true`) → permet de **retrouver/filtrer** les workspaces et de **ne jamais toucher** aux conteneurs hors-sawadev.
-- **Volumes** : un volume Docker (ou bind mount `/data/workspaces/<id>`) monté sur `/workspace` → persiste à la recréation.
-- **Réseau** : réseau Docker dédié `sawadev_net` ; l'orchestrateur et Caddy y sont attachés pour joindre les workspaces par nom de conteneur.
-- **Cycle de vie** : `always-on` par défaut. `idle-stop` (post-MVP) via suivi d'activité.
-- **Important (MAJ) :** les workspaces ne font **PAS** partie du `docker-compose` (créés à la volée) → une MAJ de l'app ne les interrompt jamais.
+Un workspace est un **groupe de conteneurs** (cf. SPEC §3 ter), pas un conteneur unique.
+- **Réseau dédié** : à la création, crée le bridge `sawadev-ws-<id>` et y attache le conteneur dev (+ tools + Caddy). Les conteneurs se joignent **par nom DNS** ; pas de collision entre workspaces, isolation par défaut.
+- **Conteneur dev** : `sawadev-<id>-dev`, volume `/workspace` persistant (bind `/data/workspaces/<id>` au MVP), c'est l'ancre (terminal + agent). Les **apps** de l'utilisateur tournent comme **process dans le conteneur dev** (ports `:3000`, `:3001`…).
+- **Labels sur TOUT** : `sawadev.managed=true`, `sawadev.workspace=<id>`, `sawadev.role=dev|tool|app`, `sawadev.tool=<type>` → filtrage fiable ; **ne jamais toucher** un conteneur non labellisé.
+- **Cycle de vie groupé** : `start/stop/remove` agissent sur **tous** les conteneurs du label `workspace=<id>`. `inspect`/`stats` pour statut/ressources. `always-on` par défaut, `idle-stop` post-MVP.
+- **Suppression** : retire conteneurs + réseau ; **volumes supprimés sur confirmation** (données des BDD).
+- **Important (MAJ) :** les conteneurs d'un workspace ne font **PAS** partie du `docker-compose` (créés à la volée) → une MAJ de l'app ne les interrompt jamais.
+
+### 6.2bis Tools (`tools/`) — services managés (BDD, redis…)
+- **Catalogue** de types (`postgres`, `mysql`, `mongo`, `redis`…) avec image, port standard, volume, génération d'identifiants.
+- **Création par l'orchestrateur uniquement** (pas de socket Docker dans le conteneur dev) : crée `sawadev-<id>-<tool>`, l'attache au réseau du workspace avec le hostname standard (`db`, `redis`…), crée le volume `sawadev-ws-<id>-<tool>-data`, labels `role=tool`.
+- **Câblage** : écrit les infos de connexion dans `/workspace/.sawadev/tools.env` (lisible par les apps) et les expose dans l'UI. Identifiants chiffrés en base (`tools.secrets_*`). Pas de recréation du conteneur dev.
+- Start/stop/delete par tool ; delete propose la suppression du volume.
+
+### 6.2ter Ports hôte (`ports/`)
+- **Par défaut : aucun port publié sur l'hôte.** Le HTTP passe par Caddy via le réseau (cf. §6.5).
+- Sur demande explicite (« exposer en TCP », ex. client BDD externe), alloue un **port libre dans un pool dynamique** (à partir de 18000), enregistre dans `host_ports`, recrée/route le mapping vers `conteneur:portInterne`. Libération sur retrait.
 
 ### 6.3 Terminal (`terminal/`)
 - **Approche MVP** : `docker exec -it <container> <shell>` via l'API `dockerode.exec` (TTY activé), branché sur une WebSocket. Pas besoin de `node-pty` côté hôte puisque le PTY vit **dans le conteneur**.
@@ -276,9 +326,10 @@ apps/orchestrator/src/
 
 ### 6.5 Caddy (`caddy/`)
 - Caddy en conteneur avec **Admin API** activée (`localhost:2019`, non exposée publiquement).
+- **Caddy est attaché au réseau de chaque workspace** (`sawadev-ws-<id>`) → il joint les conteneurs **par nom**, sans port hôte.
 - L'orchestrateur **POST/PATCH** la config JSON de Caddy pour :
   - router `app.domaine.com` → orchestrateur (UI + API + WS) ;
-  - router chaque `projet-<port>.domaine.com` → `conteneur_workspace:port` (preview).
+  - router chaque `<id>-<port>.domaine.com` → `sawadev-<id>-dev:<port>` (preview HTTP), via le réseau du workspace.
 - **TLS** : wildcard `*.domaine.com` via **DNS-01 (Cloudflare)**. Build Caddy custom (`xcaddy` + plugin DNS) → image Caddy maison.
 - **Dev local** : pas de DNS public → `*.localhost` + certificats internes Caddy (CA locale).
 
@@ -379,10 +430,11 @@ Règles : **aucun secret dans le dépôt** ; secrets via env / volume ; logs san
 - Passkeys WebAuthn (register + login) bout-en-bout avec le front existant.
 - **Accepté si** : 1ère install crée l'admin ; login mot de passe **et** passkey fonctionnent ; routes `/api/*` rejettent sans session ; logout invalide la session.
 
-### M2 — Workspaces & persistance *(SPEC MVP #3)*
-- CRUD workspaces via `dockerode` ; volume persistant ; labels ; réseau dédié ; statut/ressources.
+### M2 — Workspaces (groupe) & persistance *(SPEC MVP #3)*
+- CRUD workspaces via `dockerode` selon le **modèle de groupe** : à la création, **réseau dédié** `sawadev-ws-<id>` + conteneur dev `sawadev-<id>-dev` + volume `/workspace`.
+- **Labels** complets (`managed`, `workspace`, `role=dev`) ; cycle de vie **groupé** (filtre par label).
 - Dashboard front branché sur l'API réelle.
-- **Accepté si** : créer/démarrer/arrêter/supprimer un workspace depuis l'UI ; le contenu d'un volume survit à une recréation ; aucun conteneur non labellisé n'est touché.
+- **Accepté si** : créer/démarrer/arrêter/supprimer un workspace depuis l'UI ; le réseau est créé/détruit avec le workspace ; le volume survit à une recréation ; aucun conteneur non labellisé n'est touché.
 
 ### M3 — Fichiers + éditeur *(SPEC MVP #4)*
 - API fichiers (confinée) ; arbre paresseux ; **CodeMirror 6** (ouverture/édition/sauvegarde).
@@ -393,26 +445,40 @@ Règles : **aucun secret dans le dépôt** ; secrets via env / volume ; logs san
 - **Accepté si** : terminal interactif fonctionnel (commandes, couleurs, redimensionnement) dans un workspace, depuis le navigateur.
 
 ### M5 — Routage / preview *(SPEC MVP #6)*
-- Caddy Admin API : route dynamique `projet-<port>.domaine.com` → conteneur ; gestion des ports côté UI.
-- **Accepté si** : lancer une app sur un port dans un workspace → y accéder via son sous-domaine HTTPS.
+- Caddy attaché au réseau du workspace ; route dynamique `<id>-<port>.domaine.com` → `sawadev-<id>-dev:<port>` **sans port hôte** ; gestion des previews côté UI.
+- **Accepté si** : lancer une app sur un port dans un workspace → y accéder via son sous-domaine HTTPS, sans publication de port sur l'hôte.
 
 > **Fin du MVP v0.1 « coder depuis mon téléphone ».**
 
-### M6 — Confort *(SPEC v0.2)*
+### M6 — Tools & services managés *(SPEC v0.2)*
+- **Catalogue** de tools (postgres, mysql, mongo, redis…) ; ajout d'un tool = conteneur dédié `role=tool` sur le réseau du workspace + volume + identifiants générés.
+- Câblage `/workspace/.sawadev/tools.env` + affichage UI ; start/stop/delete par tool (suppression de volume sur confirmation).
+- **Exposition TCP** sur l'hôte à la demande (pool dynamique).
+- **Accepté si** : ajouter un Postgres à un workspace, le joindre par `db:5432` depuis le conteneur dev, et persister ses données après recréation du conteneur dev.
+
+### M7 — Confort *(SPEC v0.2)*
 - Enveloppe **chat** d'un agent CLI (au-delà du terminal brut) ; gestion des **clés API** chiffrées ; multi-workspaces démarrage/arrêt ; **MAJ one-click** (updater + health-check + rollback) + notification.
 
 ### Plus tard *(SPEC « Plus tard »)*
-- `devcontainer.json` ; repli HTTP-01 + multi-provider DNS ; idle-stop ; `docker-socket-proxy` ; auto-update programmée.
+- `devcontainer.json` (et services déclarés type compose) ; repli HTTP-01 + multi-provider DNS ; idle-stop ; **accès Docker brut opt-in par workspace** + `docker-socket-proxy` ; auto-update programmée.
 
 ---
 
-## 13. Risques & décisions à confirmer
+## 13. Décisions & risques
 
-- **Fichiers : bind mount vs exec.** Recommandation : **bind mount** au MVP (simplicité/perf). À confirmer.  on choisi bind mount
-- **Routeur HTTP : maison vs `hono`.** Recommandation : `hono` (léger). À confirmer si on veut 0 dépendance. ok hono
-- **Service du front : par l'orchestrateur ou par Caddy.** Recommandation : orchestrateur au MVP (un seul process à servir), Caddy plus tard si besoin de cache statique.
-- **Agent CLI au MVP :** réutiliser le flux terminal stylé en chat, ou parser dès le départ ? Recommandation : flux terminal d'abord, parsing « cartes » ensuite (M6).
-- **`rpID` WebAuthn** dépend du domaine final → bien le rendre configurable (prod vs `localhost`).
+**Décisions tranchées :**
+- **Fichiers :** **bind mount** au MVP (simplicité/perf).
+- **Routeur HTTP :** **`hono`** (léger).
+- **Workspace = groupe de conteneurs** + **réseau dédié par workspace** (cf. SPEC §3 ter).
+- **Apps = process dans le conteneur dev** ; conteneur séparé seulement sur demande.
+- **Tools (BDD…) = conteneurs dédiés créés par l'orchestrateur** (catalogue managé, **pas** de socket Docker dans le workspace).
+- **Ports hôte :** aucun par défaut (HTTP via Caddy/réseau) ; **pool dynamique** à la demande pour le TCP brut.
+
+**Encore ouvert / à surveiller :**
+- **Service du front :** orchestrateur au MVP (un seul process), Caddy plus tard si besoin de cache statique.
+- **Agent CLI :** flux terminal stylé en chat d'abord ; parsing « cartes » (diffs, outils) ensuite (M7).
+- **`rpID` WebAuthn** dépend du domaine final → configurable (prod vs `localhost`).
+- **Accès Docker brut dans un workspace** : repoussé (opt-in + `docker-socket-proxy` « plus tard »).
 
 ---
 
