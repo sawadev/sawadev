@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useUI } from '../context';
 import { HIcon } from '../icons';
 import { UserMark } from '../ui';
-import { useUI } from '../context';
 
 const NAV: { icon: string; to: string; match: (p: string) => boolean }[] = [
   { icon: 'grid', to: '/workspaces', match: (p) => p === '/workspaces' || p === '/' },
@@ -16,9 +16,44 @@ export function DeskRail() {
   const { pathname } = useLocation();
   const { theme, toggleTheme } = useUI();
   return (
-    <div style={{ width: 58, flexShrink: 0, background: 'var(--surface-2)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '14px 0', gap: 6 }}>
-      <button onClick={() => nav('/workspaces')} style={{ width: 32, height: 32, borderRadius: 9, background: 'var(--bg)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10, cursor: 'pointer', padding: 0 }}>
-        <span style={{ width: 13, height: 13, borderRadius: 4, background: 'var(--accent)', transform: 'rotate(45deg)' }} />
+    <div
+      style={{
+        width: 58,
+        flexShrink: 0,
+        background: 'var(--surface-2)',
+        borderRight: '1px solid var(--border)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '14px 0',
+        gap: 6,
+      }}
+    >
+      <button
+        onClick={() => nav('/workspaces')}
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 9,
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 10,
+          cursor: 'pointer',
+          padding: 0,
+        }}
+      >
+        <span
+          style={{
+            width: 13,
+            height: 13,
+            borderRadius: 4,
+            background: 'var(--accent)',
+            transform: 'rotate(45deg)',
+          }}
+        />
       </button>
       {NAV.map((it, i) => {
         const on = it.match(pathname);
@@ -39,15 +74,27 @@ export function DeskRail() {
               border: on ? '1px solid var(--border-soft)' : '1px solid transparent',
             }}
           >
-            <HIcon name={it.icon} size={19} color={on ? 'var(--text)' : 'var(--faint)'} sw={on ? 1.8 : 1.6} />
+            <HIcon
+              name={it.icon}
+              size={19}
+              color={on ? 'var(--text)' : 'var(--faint)'}
+              sw={on ? 1.8 : 1.6}
+            />
           </button>
         );
       })}
       <div style={{ flex: 1 }} />
-      <button onClick={toggleTheme} className="btn btn-ghost btn-icon" style={{ width: 40, height: 40 }}>
+      <button
+        onClick={toggleTheme}
+        className="btn btn-ghost btn-icon"
+        style={{ width: 40, height: 40 }}
+      >
         <HIcon name={theme === 'dark' ? 'sun' : 'moon'} size={18} color="var(--muted)" />
       </button>
-      <button onClick={() => nav('/settings')} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}>
+      <button
+        onClick={() => nav('/settings')}
+        style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}
+      >
         <UserMark size={32} />
       </button>
     </div>

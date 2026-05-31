@@ -40,7 +40,16 @@ export function IPadDevice({
           boxShadow: 'inset 0 0 2px rgba(0,0,0,0.6)',
         }}
       />
-      <div style={{ width, height, borderRadius: 20, overflow: 'hidden', position: 'relative', background: dark ? '#000' : '#fff' }}>
+      <div
+        style={{
+          width,
+          height,
+          borderRadius: 20,
+          overflow: 'hidden',
+          position: 'relative',
+          background: dark ? '#000' : '#fff',
+        }}
+      >
         {children}
         {/* home indicator */}
         <div

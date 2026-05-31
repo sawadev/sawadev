@@ -408,8 +408,8 @@ Règles : **aucun secret dans le dépôt** ; secrets via env / volume ; logs san
 
 ## 13. Risques & décisions à confirmer
 
-- **Fichiers : bind mount vs exec.** Recommandation : **bind mount** au MVP (simplicité/perf). À confirmer.
-- **Routeur HTTP : maison vs `hono`.** Recommandation : `hono` (léger). À confirmer si on veut 0 dépendance.
+- **Fichiers : bind mount vs exec.** Recommandation : **bind mount** au MVP (simplicité/perf). À confirmer.  on choisi bind mount
+- **Routeur HTTP : maison vs `hono`.** Recommandation : `hono` (léger). À confirmer si on veut 0 dépendance. ok hono
 - **Service du front : par l'orchestrateur ou par Caddy.** Recommandation : orchestrateur au MVP (un seul process à servir), Caddy plus tard si besoin de cache statique.
 - **Agent CLI au MVP :** réutiliser le flux terminal stylé en chat, ou parser dès le départ ? Recommandation : flux terminal d'abord, parsing « cartes » ensuite (M6).
 - **`rpID` WebAuthn** dépend du domaine final → bien le rendre configurable (prod vs `localhost`).

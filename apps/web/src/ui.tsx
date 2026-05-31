@@ -3,7 +3,11 @@ import { HIcon } from './icons';
 import type { CodeLine } from './types';
 
 /** AI mark — accent rounded square with sparkle. */
-export function AIMark({ size = 28, r, style }: { size?: number; r?: number; style?: CSSProperties }) {
+export function AIMark({
+  size = 28,
+  r,
+  style,
+}: { size?: number; r?: number; style?: CSSProperties }) {
   return (
     <div
       style={{
@@ -24,7 +28,11 @@ export function AIMark({ size = 28, r, style }: { size?: number; r?: number; sty
   );
 }
 
-export function UserMark({ size = 28, label = 'JM', style }: { size?: number; label?: string; style?: CSSProperties }) {
+export function UserMark({
+  size = 28,
+  label = 'JM',
+  style,
+}: { size?: number; label?: string; style?: CSSProperties }) {
   return (
     <div
       style={{
@@ -79,7 +87,7 @@ export function Logo({ size = 20, style }: { size?: number; style?: CSSPropertie
 }
 
 export function StatusDot({ on, live }: { on?: boolean; live?: boolean }) {
-  return <span className={'dot ' + (on ? 'dot-on' : 'dot-off') + (live ? ' dot-live' : '')} />;
+  return <span className={`dot ${on ? 'dot-on' : 'dot-off'}${live ? ' dot-live' : ''}`} />;
 }
 
 export function Typing() {
@@ -93,7 +101,11 @@ export function Typing() {
 }
 
 /** Code renderer. line: { add, del, ind, t: [['kw','const'], ...] } or { gap:true } */
-export function Code({ lines, startNo = 1, pad = 0 }: { lines: CodeLine[]; startNo?: number; pad?: number }) {
+export function Code({
+  lines,
+  startNo = 1,
+  pad = 0,
+}: { lines: CodeLine[]; startNo?: number; pad?: number }) {
   let no = startNo;
   return (
     <div className="code" style={{ padding: pad }}>
@@ -103,15 +115,22 @@ export function Code({ lines, startNo = 1, pad = 0 }: { lines: CodeLine[]; start
         const sign = l.add ? '+' : l.del ? '−' : '';
         return (
           <div key={i} style={{ display: 'flex', minHeight: 21, background: bg, borderRadius: 3 }}>
-            <span className="ln" style={{ width: 30, textAlign: 'right', paddingRight: 12, flexShrink: 0 }}>
+            <span
+              className="ln"
+              style={{ width: 30, textAlign: 'right', paddingRight: 12, flexShrink: 0 }}
+            >
               {num}
             </span>
             {sign && (
-              <span style={{ width: 12, color: l.add ? 'var(--good)' : 'var(--c-num)', flexShrink: 0 }}>{sign}</span>
+              <span
+                style={{ width: 12, color: l.add ? 'var(--good)' : 'var(--c-num)', flexShrink: 0 }}
+              >
+                {sign}
+              </span>
             )}
             <span style={{ paddingLeft: (l.ind || 0) * 18 + (sign ? 0 : 12) }}>
               {(l.t || []).map((seg, j) => (
-                <span key={j} className={'tk-' + seg[0]}>
+                <span key={j} className={`tk-${seg[0]}`}>
                   {seg[1]}
                 </span>
               ))}

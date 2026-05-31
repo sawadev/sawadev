@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { HIcon } from '../icons';
-import { AIMark, Code, StatusDot, Typing } from '../ui';
 import { DIFF_BODY, FILE_MIDDLEWARE, PORTS, SUGGESTIONS, TREE } from '../data';
+import { HIcon } from '../icons';
 import type { Msg } from '../types';
+import { AIMark, Code, StatusDot, Typing } from '../ui';
 
 // ── chat building blocks ─────────────────────────────────────────
 export function Bubble({ children }: { children: ReactNode }) {
@@ -32,7 +32,15 @@ export function AgentText({ children, muted }: { children: ReactNode; muted?: bo
   return (
     <div className="rise" style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
       <AIMark size={26} />
-      <div style={{ flex: 1, fontSize: 14.5, lineHeight: 1.5, color: muted ? 'var(--text-2)' : 'var(--text)', paddingTop: 2 }}>
+      <div
+        style={{
+          flex: 1,
+          fontSize: 14.5,
+          lineHeight: 1.5,
+          color: muted ? 'var(--text-2)' : 'var(--text)',
+          paddingTop: 2,
+        }}
+      >
         {children}
       </div>
     </div>
@@ -43,10 +51,16 @@ function DiffBody() {
   return <Code lines={DIFF_BODY} />;
 }
 
-export function ToolCard({ m, onApprove }: { m: Extract<Msg, { role: 'tool' }>; onApprove?: () => void }) {
+export function ToolCard({
+  m,
+  onApprove,
+}: { m: Extract<Msg, { role: 'tool' }>; onApprove?: () => void }) {
   const [done, setDone] = useState(false);
   return (
-    <div className="rise card" style={{ marginLeft: 36, overflow: 'hidden', background: 'var(--surface-2)' }}>
+    <div
+      className="rise card"
+      style={{ marginLeft: 36, overflow: 'hidden', background: 'var(--surface-2)' }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 13px' }}>
         <HIcon name={m.icon} size={15} color="var(--muted)" />
         <span style={{ fontSize: 13, fontWeight: 600 }}>{m.title}</span>
@@ -56,7 +70,13 @@ export function ToolCard({ m, onApprove }: { m: Extract<Msg, { role: 'tool' }>; 
         <div style={{ flex: 1 }} />
         {m.kind === 'edit' && <span className="chip chip-sm chip-accent">+24 −3</span>}
       </div>
-      <div style={{ padding: '0 13px 12px', borderTop: '1px solid var(--border-soft)', paddingTop: 10 }}>
+      <div
+        style={{
+          padding: '0 13px 12px',
+          borderTop: '1px solid var(--border-soft)',
+          paddingTop: 10,
+        }}
+      >
         {m.body === 'diff' ? (
           <DiffBody />
         ) : (
@@ -76,7 +96,16 @@ export function ToolCard({ m, onApprove }: { m: Extract<Msg, { role: 'tool' }>; 
           }}
         >
           {done ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--good)', fontSize: 13, fontWeight: 600 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                color: 'var(--good)',
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
               <HIcon name="check" size={15} color="var(--good)" />
               Approved · committed to main
             </div>
@@ -87,7 +116,7 @@ export function ToolCard({ m, onApprove }: { m: Extract<Msg, { role: 'tool' }>; 
                 style={{ flex: 1 }}
                 onClick={() => {
                   setDone(true);
-                  onApprove && onApprove();
+                  onApprove?.();
                 }}
               >
                 <HIcon name="check" size={14} color="var(--on-accent)" />
@@ -105,7 +134,11 @@ export function ToolCard({ m, onApprove }: { m: Extract<Msg, { role: 'tool' }>; 
 }
 
 // ── AI pane ──────────────────────────────────────────────────────
-export function AIPane({ msgs, running, onSend }: { msgs: Msg[]; running: boolean; onSend: (v: string) => void }) {
+export function AIPane({
+  msgs,
+  running,
+  onSend,
+}: { msgs: Msg[]; running: boolean; onSend: (v: string) => void }) {
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = scroller.current;
@@ -115,21 +148,41 @@ export function AIPane({ msgs, running, onSend }: { msgs: Msg[]; running: boolea
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       <div
         ref={scroller}
-        style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 14px 6px', display: 'flex', flexDirection: 'column', gap: 13 }}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          padding: '14px 14px 6px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 13,
+        }}
       >
         <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)' }} className="mono">
           session · storefront-api · main
         </div>
         {msgs.map((m, i) => {
           if (m.role === 'user') return <Bubble key={i}>{m.text}</Bubble>;
-          if (m.role === 'agent') return <AgentText key={i} muted={m.muted}>{m.text}</AgentText>;
+          if (m.role === 'agent')
+            return (
+              <AgentText key={i} muted={m.muted}>
+                {m.text}
+              </AgentText>
+            );
           if (m.role === 'tool') return <ToolCard key={i} m={m} />;
           return null;
         })}
         {running && (
           <div className="fade" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <AIMark size={26} />
-            <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border-soft)', borderRadius: 14, padding: '10px 14px' }}>
+            <div
+              style={{
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border-soft)',
+                borderRadius: 14,
+                padding: '10px 14px',
+              }}
+            >
               <Typing />
             </div>
           </div>
@@ -150,11 +203,22 @@ function ChatInput({ onSend, running }: { onSend: (v: string) => void; running: 
     onSend(v);
   };
   return (
-    <div style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)', padding: '10px 12px' }}>
+    <div
+      style={{
+        borderTop: '1px solid var(--border)',
+        background: 'var(--surface)',
+        padding: '10px 12px',
+      }}
+    >
       {!running && (
         <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 9 }}>
           {SUGGESTIONS.map((s, i) => (
-            <button key={i} className="chip chip-sm chip-press" style={{ flexShrink: 0 }} onClick={() => onSend(s)}>
+            <button
+              key={i}
+              className="chip chip-sm chip-press"
+              style={{ flexShrink: 0 }}
+              onClick={() => onSend(s)}
+            >
               <HIcon name="sparkleSm" size={12} color="var(--accent-text)" />
               {s}
             </button>
@@ -172,7 +236,15 @@ function ChatInput({ onSend, running }: { onSend: (v: string) => void; running: 
           main
         </span>
       </div>
-      <div className={'field' + (focus ? ' focus' : '')} style={{ height: 'auto', minHeight: 46, padding: '8px 10px 8px 12px', alignItems: 'center' }}>
+      <div
+        className={`field${focus ? ' focus' : ''}`}
+        style={{
+          height: 'auto',
+          minHeight: 46,
+          padding: '8px 10px 8px 12px',
+          alignItems: 'center',
+        }}
+      >
         <HIcon name="attach" size={18} color="var(--faint)" />
         <input
           value={val}
@@ -183,12 +255,25 @@ function ChatInput({ onSend, running }: { onSend: (v: string) => void; running: 
             if (e.key === 'Enter') submit();
           }}
           placeholder="Ask the agent to build something…"
-          style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', font: 'inherit', fontSize: 14.5, color: 'var(--text)' }}
+          style={{
+            flex: 1,
+            border: 'none',
+            outline: 'none',
+            background: 'transparent',
+            font: 'inherit',
+            fontSize: 14.5,
+            color: 'var(--text)',
+          }}
         />
         <button
           onClick={submit}
           className="btn btn-primary btn-icon btn-sm"
-          style={{ width: 36, height: 36, borderRadius: 10, opacity: val.trim() && !running ? 1 : 0.5 }}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            opacity: val.trim() && !running ? 1 : 0.5,
+          }}
         >
           <HIcon name="send" size={16} color="var(--on-accent)" />
         </button>
@@ -231,11 +316,22 @@ export function FilesPane({ onOpen }: { onOpen: () => void }) {
               <span style={{ width: 12 }} />
             )}
             <HIcon name={t.ic} size={16} color={t.cur ? 'var(--accent-text)' : 'var(--muted)'} />
-            <span className="mono" style={{ fontSize: 13.5, fontWeight: t.cur ? 600 : 500, color: t.cur ? 'var(--text)' : 'var(--text-2)', flex: 1 }}>
+            <span
+              className="mono"
+              style={{
+                fontSize: 13.5,
+                fontWeight: t.cur ? 600 : 500,
+                color: t.cur ? 'var(--text)' : 'var(--text-2)',
+                flex: 1,
+              }}
+            >
               {t.n}
             </span>
             {t.badge && (
-              <span className="mono" style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--accent-text)' }}>
+              <span
+                className="mono"
+                style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--accent-text)' }}
+              >
                 {t.badge}
               </span>
             )}
@@ -249,8 +345,24 @@ export function FilesPane({ onOpen }: { onOpen: () => void }) {
 // ── Editor pane ──────────────────────────────────────────────────
 export function EditorPane({ onAskAI }: { onAskAI: () => void }) {
   return (
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'var(--surface)' }}>
-      <div style={{ display: 'flex', alignItems: 'stretch', height: 40, borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'var(--surface)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'stretch',
+          height: 40,
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--surface-2)',
+        }}
+      >
         <div
           style={{
             display: 'flex',
@@ -278,7 +390,17 @@ export function EditorPane({ onAskAI }: { onAskAI: () => void }) {
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 8px' }}>
         <Code lines={FILE_MIDDLEWARE} />
       </div>
-      <div style={{ height: 46, borderTop: '1px solid var(--border)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px' }}>
+      <div
+        style={{
+          height: 46,
+          borderTop: '1px solid var(--border)',
+          background: 'var(--surface-2)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '0 14px',
+        }}
+      >
         <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
           TS · Ln 6 · 2 edits
         </span>
@@ -297,7 +419,13 @@ function TermRow({ children, c, prompt }: { children: ReactNode; c?: string; pro
   return (
     <div
       className="mono"
-      style={{ fontSize: 12, lineHeight: 1.7, color: c || 'rgba(220,220,212,0.92)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+      style={{
+        fontSize: 12,
+        lineHeight: 1.7,
+        color: c || 'rgba(220,220,212,0.92)',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+      }}
     >
       {prompt && <span style={{ color: 'var(--accent-text)' }}>$ </span>}
       {children}
@@ -307,8 +435,24 @@ function TermRow({ children, c, prompt }: { children: ReactNode; c?: string; pro
 
 export function TerminalPane() {
   return (
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'var(--term-bg)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'var(--term-bg)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '9px 14px',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+        }}
+      >
         <span className="dot dot-live" style={{ background: 'var(--good)' }} />
         <span className="mono" style={{ fontSize: 12, color: 'rgba(220,220,212,0.85)' }}>
           bash · agent session
@@ -322,13 +466,13 @@ export function TerminalPane() {
           claude "add JWT auth middleware"
         </TermRow>
         <TermRow c="rgba(160,160,152,0.9)">● Claude Code · analyzing repo…</TermRow>
-        <TermRow c="rgba(160,160,152,0.9)">  ↳ read src/server.ts, src/auth/</TermRow>
+        <TermRow c="rgba(160,160,152,0.9)"> ↳ read src/server.ts, src/auth/</TermRow>
         <TermRow c="var(--accent-text)">✎ editing src/auth/middleware.ts</TermRow>
-        <TermRow>  + 24 lines  − 3 lines</TermRow>
+        <TermRow> + 24 lines − 3 lines</TermRow>
         <TermRow prompt c="rgba(240,240,233,0.95)">
           npm run test auth
         </TermRow>
-        <TermRow c="#7fd99a">  ✓ 14 passing  (1.2s)</TermRow>
+        <TermRow c="#7fd99a"> ✓ 14 passing (1.2s)</TermRow>
         <TermRow prompt c="rgba(240,240,233,0.95)">
           <span
             style={{
@@ -343,7 +487,17 @@ export function TerminalPane() {
         </TermRow>
       </div>
       <div style={{ padding: 12, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '0 12px', height: 42 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 9,
+            background: 'rgba(255,255,255,0.06)',
+            borderRadius: 10,
+            padding: '0 12px',
+            height: 42,
+          }}
+        >
           <span className="mono" style={{ color: 'var(--accent-text)', fontSize: 13 }}>
             $
           </span>
@@ -360,12 +514,38 @@ export function TerminalPane() {
 // ── Preview pane ─────────────────────────────────────────────────
 export function PreviewPane() {
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>Running apps · auto subdomains</div>
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        overflowY: 'auto',
+        padding: 14,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      }}
+    >
+      <div style={{ fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>
+        Running apps · auto subdomains
+      </div>
       {PORTS.map((p, i) => (
-        <div key={i} className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div
+          key={i}
+          className="card"
+          style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 11, background: 'var(--elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 11,
+                background: 'var(--elevated)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <HIcon name="globe" size={18} color="var(--muted)" />
             </div>
             <div style={{ flex: 1 }}>
@@ -375,18 +555,44 @@ export function PreviewPane() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                 <StatusDot on={p.on} live={p.on} />
-                <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>{p.on ? 'live' : 'stopped'}</span>
+                <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
+                  {p.on ? 'live' : 'stopped'}
+                </span>
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 36, borderRadius: 9, background: 'var(--surface-2)', border: '1px solid var(--border-soft)', padding: '0 11px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              height: 36,
+              borderRadius: 9,
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border-soft)',
+              padding: '0 11px',
+            }}
+          >
             <HIcon name="lock" size={12} color="var(--faint)" />
-            <span className="mono" style={{ fontSize: 11, color: 'var(--text-2)', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+            <span
+              className="mono"
+              style={{
+                fontSize: 11,
+                color: 'var(--text-2)',
+                flex: 1,
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+              }}
+            >
               storefront-{p.port}.sawadev.io
             </span>
             <HIcon name="copy" size={14} color="var(--faint)" />
           </div>
-          <button className={'btn btn-sm ' + (p.on ? 'btn-primary' : 'btn-outline')} style={{ opacity: p.on ? 1 : 0.6 }}>
+          <button
+            className={`btn btn-sm ${p.on ? 'btn-primary' : 'btn-outline'}`}
+            style={{ opacity: p.on ? 1 : 0.6 }}
+          >
             <HIcon name="external" size={14} color={p.on ? 'var(--on-accent)' : 'var(--text)'} />
             Open in browser
           </button>

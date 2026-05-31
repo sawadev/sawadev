@@ -1,16 +1,16 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { HIcon } from './icons';
-import { ACCENTS } from './data';
-import type { Device, Theme } from './types';
 import { UIContext, useUI } from './context';
-import { MobileLogin, MobileDashboard, MobileIDE, MobileSettings } from './mobile/pages';
-import { DesktopLogin, DesktopWorkspaces, DesktopSettings } from './desktop/pages';
+import { ACCENTS } from './data';
 import { DesktopIDE } from './desktop/DesktopIDE';
-import { TabletIDE } from './tablet/TabletIDE';
+import { DesktopLogin, DesktopSettings, DesktopWorkspaces } from './desktop/pages';
 import { IOSDevice } from './device/IOSDevice';
 import { IPadDevice } from './device/IPadDevice';
+import { HIcon } from './icons';
+import { MobileDashboard, MobileIDE, MobileLogin, MobileSettings } from './mobile/pages';
+import { TabletIDE } from './tablet/TabletIDE';
+import type { Device, Theme } from './types';
 
 /** Viewport breakpoints used for automatic layout detection. */
 const MOBILE_QUERY = '(max-width: 700px)';
@@ -90,9 +90,19 @@ function DevicePreview({ kind, theme }: { kind: 'mobile' | 'tablet'; theme: Them
   const H = phone ? 874 : 866;
   const scale = useViewportScale(W, H, 80);
   return (
-    <div className={'stage ' + theme} style={{ position: 'fixed', inset: 0 }}>
+    <div className={`stage ${theme}`} style={{ position: 'fixed', inset: 0 }}>
       <div style={{ width: W * scale, height: H * scale, position: 'relative' }}>
-        <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+        <div
+          style={{
+            width: W,
+            height: H,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+          }}
+        >
           {phone ? (
             <IOSDevice width={402} height={874} dark={theme === 'dark'}>
               <div style={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
@@ -152,7 +162,15 @@ function DevBar({
         }}
       >
         <HIcon name="gear" size={15} color="var(--text-2)" />
-        <span style={{ width: 12, height: 12, borderRadius: 7, background: accent, border: '1px solid var(--border)' }} />
+        <span
+          style={{
+            width: 12,
+            height: 12,
+            borderRadius: 7,
+            background: accent,
+            border: '1px solid var(--border)',
+          }}
+        />
         <HIcon name="chevL" size={14} color="var(--faint)" />
       </button>
     );
@@ -177,7 +195,12 @@ function DevBar({
     >
       <div className="seg">
         {(['auto', 'mobile', 'tablet', 'desktop'] as DevicePref[]).map((p) => (
-          <button key={p} className={pref === p ? 'on' : ''} onClick={() => setPref(p)} style={{ textTransform: 'capitalize' }}>
+          <button
+            key={p}
+            className={pref === p ? 'on' : ''}
+            onClick={() => setPref(p)}
+            style={{ textTransform: 'capitalize' }}
+          >
             {p}
           </button>
         ))}
@@ -206,7 +229,11 @@ function DevBar({
         ))}
       </div>
       <div style={{ width: 1, height: 22, background: 'var(--border)' }} />
-      <button onClick={() => setOpen('closed')} className="btn btn-ghost btn-icon btn-sm" title="Collapse">
+      <button
+        onClick={() => setOpen('closed')}
+        className="btn btn-ghost btn-icon btn-sm"
+        title="Collapse"
+      >
         <HIcon name="chevR" size={16} color="var(--faint)" />
       </button>
     </div>
@@ -231,7 +258,11 @@ export function App() {
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
 
   return (
-    <div className="sawa" data-theme={theme} style={{ ['--accent' as keyof CSSProperties]: accent } as CSSProperties}>
+    <div
+      className="sawa"
+      data-theme={theme}
+      style={{ ['--accent' as keyof CSSProperties]: accent } as CSSProperties}
+    >
       <UIContext.Provider value={{ theme, toggleTheme, accent, setAccent, device, isMobile }}>
         <BrowserRouter>
           {framedMobile ? (
@@ -246,7 +277,14 @@ export function App() {
         </BrowserRouter>
 
         {import.meta.env.DEV && (
-          <DevBar pref={pref} setPref={setPref} theme={theme} onToggleTheme={toggleTheme} accent={accent} onAccent={setAccent} />
+          <DevBar
+            pref={pref}
+            setPref={setPref}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            accent={accent}
+            onAccent={setAccent}
+          />
         )}
       </UIContext.Provider>
     </div>

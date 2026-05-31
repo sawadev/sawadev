@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { HIcon } from '../icons';
-import { AIMark, StatusDot } from '../ui';
 import { SEED_MSGS, WS, buildAgentRun } from '../data';
-import type { Msg } from '../types';
-import { AIPane, EditorPane, FilesPane, PreviewPane, TerminalPane } from '../mobile/panes';
 import { DeskRail } from '../desktop/DesktopShell';
+import { HIcon } from '../icons';
+import { AIPane, EditorPane, FilesPane, PreviewPane, TerminalPane } from '../mobile/panes';
+import type { Msg } from '../types';
+import { AIMark, StatusDot } from '../ui';
 
 const PANES: { k: string; icon: string; label: string }[] = [
   { k: 'files', icon: 'folder', label: 'Files' },
@@ -53,7 +53,18 @@ export function TabletIDE() {
 
       {/* work column */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ height: 56, flexShrink: 0, borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 14, padding: '0 18px' }}>
+        <div
+          style={{
+            height: 56,
+            flexShrink: 0,
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--surface)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            padding: '0 18px',
+          }}
+        >
           <div>
             <div className="mono" style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.1 }}>
               {ws.id}
@@ -84,18 +95,44 @@ export function TabletIDE() {
             Run
           </button>
         </div>
-        <div key={tab} className="fade" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <div
+          key={tab}
+          className="fade"
+          style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+        >
           {leftPane}
         </div>
       </div>
 
       {/* persistent AI panel */}
-      <div style={{ width: 416, flexShrink: 0, borderLeft: '1px solid var(--border)', background: 'var(--surface-2)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ height: 56, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 11, padding: '0 18px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+      <div
+        style={{
+          width: 416,
+          flexShrink: 0,
+          borderLeft: '1px solid var(--border)',
+          background: 'var(--surface-2)',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div
+          style={{
+            height: 56,
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 11,
+            padding: '0 18px',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--surface)',
+          }}
+        >
           <AIMark size={28} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.1 }}>AI Agent</div>
-            <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>always alongside your work</div>
+            <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
+              always alongside your work
+            </div>
           </div>
           <HIcon name="history" size={17} color="var(--faint)" />
         </div>
