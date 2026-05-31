@@ -1,0 +1,16 @@
+{
+  "name": "@sawadev/shared",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "true",
+    "test": "true"
+  }
+}

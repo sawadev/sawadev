@@ -1,0 +1,77 @@
+# sawadev — stack de production (Caddy + orchestrateur).
+# Les workspaces NE figurent PAS ici : ce sont des conteneurs frères créés à la
+# volée par l'orchestrateur. Une MAJ ne recrée donc que caddy + orchestrator et
+# n'interrompt jamais les projets de l'utilisateur.
+
+services:
+  caddy:
+    image: ${REGISTRY:-ghcr.io/sawadev}/caddy:${TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Token API Cloudflare pour le DNS-01 wildcard.
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - sawadev_net
+
+  # Proxy de socket Docker : seul ce conteneur touche le socket hôte ; il
+  # n'expose qu'une liste blanche d'API à l'orchestrateur (durcissement).
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      EXEC: 1
+      IMAGES: 1
+      NETWORKS: 1
+      INFO: 1
+      VERSION: 1
+      POST: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - sawadev_net
+
+  orchestrator:
+    image: ${REGISTRY:-ghcr.io/sawadev}/orchestrator:${TAG:-latest}
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      RP_ID: ${DOMAIN}
+      RP_ORIGIN: https://app.${DOMAIN}
+      PREVIEW_SCHEME: https
+      CADDY_ADMIN: http://caddy:2019
+      # Accès Docker via le proxy (pas de socket monté ici).
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      DOCKER_NETWORK: sawadev_net
+      WORKSPACE_IMAGE: ${REGISTRY:-ghcr.io/sawadev}/workspace:${TAG:-latest}
+      WORKSPACES_DIR: /data/workspaces
+      SAWADEV_SECRET: ${SAWADEV_SECRET}
+      COMPOSE_DIR: /opt/sawadev
+      CHANNEL: ${CHANNEL:-stable}
+    volumes:
+      # Données persistantes (DB + volumes workspaces). Bind HÔTE (et non volume
+      # nommé) : indispensable en DooD pour que les binds /workspace des
+      # conteneurs frères pointent vers un chemin existant côté hôte.
+      - ${DATA_DIR:-/opt/sawadev/data}:/data
+      # Dossier compose, pour l'updater one-click.
+      - /opt/sawadev:/opt/sawadev
+    networks:
+      - sawadev_net
+    depends_on:
+      - caddy
+      - docker-socket-proxy
+
+networks:
+  sawadev_net:
+    name: sawadev_net
+
+volumes:
+  caddy_data:
+  caddy_config:

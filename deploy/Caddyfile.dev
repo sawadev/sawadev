@@ -1,0 +1,11 @@
+{
+	admin 0.0.0.0:2019
+	# Dev local : pas d'ACME (HTTP simple, certificats internes non requis).
+	auto_https off
+}
+
+# Tout passe à l'orchestrateur ; les sous-domaines de preview *.localhost
+# sont ajoutés dynamiquement par l'orchestrateur via l'Admin API.
+:80 {
+	reverse_proxy orchestrator:8787
+}

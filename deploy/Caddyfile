@@ -1,0 +1,22 @@
+{
+	# Admin API : écoute sur le réseau interne pour que l'orchestrateur puisse
+	# créer des routes de preview dynamiques. Jamais publiée sur 80/443.
+	admin 0.0.0.0:2019
+	# Certificats DNS-01 wildcard via Cloudflare (token injecté par l'env).
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+
+# UI + API + WebSocket de sawadev.
+app.{$DOMAIN} {
+	reverse_proxy orchestrator:8787
+}
+
+# Sous-domaines de preview : projet-<port>.domaine.com.
+# Les routes concrètes sont ajoutées dynamiquement par l'orchestrateur via
+# l'Admin API ; ce bloc fournit le certificat wildcard et un repli 404.
+*.{$DOMAIN} {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
+	respond "No app is exposed on this subdomain yet." 404
+}

@@ -1,0 +1,31 @@
+# Repli HTTP-01 — pour les utilisateurs sans API DNS.
+# L'UI (app.<domaine>) obtient un certificat via le challenge HTTP-01 standard.
+#
+# Limite : le challenge HTTP-01 ne délivre PAS de certificat *wildcard*. Les
+# sous-domaines de preview utilisent donc le TLS à la demande (on-demand),
+# chaque sous-domaine obtenant son certificat au premier accès.
+#
+#   Utilisation : monter ce fichier comme /etc/caddy/Caddyfile à la place du
+#   Caddyfile DNS-01 (cf. docker-compose.yml).
+
+{
+	admin 0.0.0.0:2019
+	on_demand_tls {
+		# Restreindre la délivrance à la demande aux sous-domaines du domaine.
+		# (À durcir avec un endpoint `ask` pointant vers l'orchestrateur.)
+		interval 2m
+		burst 5
+	}
+}
+
+app.{$DOMAIN} {
+	reverse_proxy orchestrator:8787
+}
+
+# Previews : certificat à la demande (HTTP-01 par sous-domaine).
+*.{$DOMAIN} {
+	tls {
+		on_demand
+	}
+	respond "No app is exposed on this subdomain yet." 404
+}
