@@ -3,6 +3,7 @@ import { type Context, Hono } from 'hono';
 import {
   PathTraversalError,
   WorkspaceNotFoundError,
+  copyWorkspacePath,
   createWorkspaceDir,
   deleteWorkspacePath,
   listDir,
@@ -86,6 +87,17 @@ export function fileRoutes(): Hono {
     if (!body?.from || !body?.to) return c.json({ error: 'invalid_body' }, 400);
     try {
       await moveWorkspacePath(c.req.param('id'), body.from, body.to);
+      return c.json({ ok: true });
+    } catch (err) {
+      return fail(c, err);
+    }
+  });
+
+  app.post('/:id/file/copy', async (c) => {
+    const body = (await c.req.json().catch(() => null)) as MoveRequest | null;
+    if (!body?.from || !body?.to) return c.json({ error: 'invalid_body' }, 400);
+    try {
+      await copyWorkspacePath(c.req.param('id'), body.from, body.to);
       return c.json({ ok: true });
     } catch (err) {
       return fail(c, err);

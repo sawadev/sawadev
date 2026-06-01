@@ -1,7 +1,9 @@
 import type { FileNode } from '@sawadev/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ChevronDown,
   ChevronRight,
+  Copy,
   File as FileIcon,
   FilePlus,
   FileText,
@@ -37,6 +39,17 @@ const ICON = 15;
 const parentDir = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
 const join = (dir: string, name: string) => (dir ? `${dir}/${name}` : name);
 
+/** Nom de copie libre : « base copy.ext », puis « base copy 2.ext »… */
+function copyName(name: string, existing: Set<string>): string {
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : '';
+  let candidate = `${stem} copy${ext}`;
+  let n = 2;
+  while (existing.has(candidate)) candidate = `${stem} copy ${n++}${ext}`;
+  return candidate;
+}
+
 interface Ctx {
   workspaceId: string;
   currentPath: string | null;
@@ -65,7 +78,8 @@ function useTree(): Ctx {
 export function FileTree({ workspaceId, currentPath, onOpen }: TreeProps) {
   // Dossiers dépliés + sélection viennent du contexte persistant du workspace.
   const { expanded, toggleExpand: toggle, expand, selected, setSelected } = useIde();
-  const { newFile, newDir, rename, remove } = useFileTreeActions(workspaceId);
+  const { newFile, newDir, rename, duplicate, remove } = useFileTreeActions(workspaceId);
+  const qc = useQueryClient();
 
   // Réactivité : surveille la racine + les dossiers dépliés côté serveur.
   const watchDirs = useMemo(() => ['', ...expanded], [expanded]);
@@ -96,6 +110,16 @@ export function FileTree({ workspaceId, currentPath, onOpen }: TreeProps) {
   };
   const del = (path: string) => {
     if (window.confirm(`Delete ${path}?`)) remove.mutate(path);
+  };
+  const dup = (path: string) => {
+    const dir = parentDir(path);
+    const name = path.split('/').pop() ?? path;
+    const nodes = qc.getQueryData<FileNode[]>(['files', workspaceId, dir || '/']) ?? [];
+    duplicate.mutate({
+      from: path,
+      to: join(dir, copyName(name, new Set(nodes.map((n) => n.name)))),
+    });
+    if (dir) expand(dir);
   };
 
   const createTargetDir = () =>
@@ -129,6 +153,7 @@ export function FileTree({ workspaceId, currentPath, onOpen }: TreeProps) {
           icon: <Pencil size={14} />,
           onClick: () => setEditing({ kind: 'rename', path: target.path }),
         },
+        { label: 'Duplicate', icon: <Copy size={14} />, onClick: () => dup(target.path) },
         {
           label: 'Delete',
           icon: <Trash2 size={14} />,
@@ -143,6 +168,7 @@ export function FileTree({ workspaceId, currentPath, onOpen }: TreeProps) {
         icon: <Pencil size={14} />,
         onClick: () => setEditing({ kind: 'rename', path: target.path }),
       },
+      { label: 'Duplicate', icon: <Copy size={14} />, onClick: () => dup(target.path) },
       {
         label: 'Delete',
         icon: <Trash2 size={14} />,

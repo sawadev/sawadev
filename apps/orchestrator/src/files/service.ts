@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { FileContent, FileNode } from '@sawadev/shared';
 import { getConfig } from '../config';
@@ -113,6 +113,21 @@ export async function moveWorkspacePath(id: string, from: string, to: string): P
   }
   await mkdir(dirname(absTo), { recursive: true });
   await rename(absFrom, absTo);
+}
+
+/** Copie (duplique) un fichier ou dossier (récursif). Refuse d'écraser une cible existante. */
+export async function copyWorkspacePath(id: string, from: string, to: string): Promise<void> {
+  const root = workspaceRoot(id);
+  const absFrom = safeResolve(root, from);
+  const absTo = safeResolve(root, to);
+  if (absFrom === absTo) throw new PathTraversalError('same path');
+  // Refuse de copier un dossier dans lui-même ou un de ses descendants.
+  const rel = relative(absFrom, absTo);
+  if (rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)) {
+    throw new PathTraversalError('cannot copy into descendant');
+  }
+  await mkdir(dirname(absTo), { recursive: true });
+  await cp(absFrom, absTo, { recursive: true, errorOnExist: true, force: false });
 }
 
 export async function createWorkspaceDir(id: string, relPath: string): Promise<void> {

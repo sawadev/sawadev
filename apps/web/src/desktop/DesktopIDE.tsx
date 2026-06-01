@@ -10,7 +10,6 @@ import { PanelResizer } from '../ide/PanelResizer';
 import { RightDock } from '../ide/RightDock';
 import { StatsChip } from '../ide/StatsChip';
 import { useIde } from '../ide/ide-context';
-import { WorkspacePreview } from '../preview/WorkspacePreview';
 import { WorkspaceTerminal } from '../terminal/Terminal';
 import { StatusDot } from '../ui';
 import { DeskRail } from './DesktopShell';
@@ -111,7 +110,6 @@ function DesktopIDEBody({ workspaceId }: { workspaceId: string }) {
   const status = workspaces.find((w) => w.id === workspaceId)?.status;
   const running = status === 'running';
   const start = useStartWorkspace();
-  const [showPreview, setShowPreview] = useState(false);
   const treeRef = useRef<HTMLDivElement>(null);
   const [treeWidth, setTreeWidth] = useState(() => {
     try {
@@ -213,40 +211,22 @@ function DesktopIDEBody({ workspaceId }: { workspaceId: string }) {
             </button>
           )}
           <div style={{ flex: 1 }} />
-          <button
-            type="button"
-            className={showPreview ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'}
-            onClick={() => setShowPreview((v) => !v)}
-          >
-            <HIcon
-              name="globe"
-              size={14}
-              color={showPreview ? 'var(--on-accent)' : 'var(--text)'}
-            />
-            Preview
-          </button>
         </div>
-        {!showPreview && (
-          <EditorTabs
-            tabs={files.tabs}
-            active={files.active}
-            dirty={files.dirty}
-            preview={files.preview}
-            onActivate={files.setActive}
-            onClose={files.close}
-            onPromote={files.promote}
-          />
-        )}
+        <EditorTabs
+          tabs={files.tabs}
+          active={files.active}
+          dirty={files.dirty}
+          preview={files.preview}
+          onActivate={files.setActive}
+          onClose={files.close}
+          onPromote={files.promote}
+        />
         <div style={{ flex: 1, minHeight: 0 }}>
-          {showPreview ? (
-            <WorkspacePreview workspaceId={workspaceId} />
-          ) : (
-            <WorkspaceFileEditor
-              workspaceId={workspaceId}
-              path={files.active}
-              onDirtyChange={files.setDirty}
-            />
-          )}
+          <WorkspaceFileEditor
+            workspaceId={workspaceId}
+            path={files.active}
+            onDirtyChange={files.setDirty}
+          />
         </div>
         <DTerm workspaceId={workspaceId} />
       </div>

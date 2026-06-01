@@ -59,6 +59,10 @@ export function moveFile(workspaceId: string, from: string, to: string): Promise
   return apiPost<{ ok: true }>(`/api/workspaces/${workspaceId}/file/move`, { from, to });
 }
 
+export function copyFile(workspaceId: string, from: string, to: string): Promise<{ ok: true }> {
+  return apiPost<{ ok: true }>(`/api/workspaces/${workspaceId}/file/copy`, { from, to });
+}
+
 export function deletePath(workspaceId: string, path: string): Promise<{ ok: true }> {
   return fetch(`/api/workspaces/${workspaceId}/file?path=${encodeURIComponent(path)}`, {
     method: 'DELETE',

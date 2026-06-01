@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { HIcon } from '../icons';
+import { WorkspacePreview } from '../preview/WorkspacePreview';
 import { WorkspaceTerminal } from '../terminal/Terminal';
 import { PanelResizer } from './PanelResizer';
 
@@ -10,9 +11,10 @@ const WIDTH_KEY = 'sawa.dock.width';
 const COLLAPSED_KEY = 'sawa.dock.collapsed';
 const MODULE_KEY = 'sawa.dock.module';
 
-type ModuleKey = 'agent' | 'git' | 'service' | 'actions';
+type ModuleKey = 'agent' | 'preview' | 'git' | 'service' | 'actions';
 const MODULES: { key: ModuleKey; label: string; icon: string }[] = [
   { key: 'agent', label: 'AI Agent', icon: 'sparkle' },
+  { key: 'preview', label: 'Preview', icon: 'globe' },
   { key: 'git', label: 'Git', icon: 'branch' },
   { key: 'service', label: 'Service', icon: 'layers' },
   { key: 'actions', label: 'Quick Actions', icon: 'bolt' },
@@ -222,6 +224,11 @@ export function RightDock({
       >
         <WorkspaceTerminal workspaceId={workspaceId} kind="agent" />
       </div>
+      {active === 'preview' && (
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', background: 'var(--bg)' }}>
+          <WorkspacePreview workspaceId={workspaceId} />
+        </div>
+      )}
       {active === 'git' && (
         <ModulePane
           icon="branch"

@@ -7,6 +7,7 @@ import { resetConfigCache } from '../config';
 import { closeDb, getDb, setDb } from '../db';
 import {
   PathTraversalError,
+  copyWorkspacePath,
   deleteWorkspacePath,
   listDir,
   moveWorkspacePath,
@@ -89,6 +90,20 @@ describe('CRUD fichiers', () => {
   it('move : refuse un dossier dans son propre descendant', async () => {
     await writeWorkspaceFile('w', 'src/index.ts', '');
     await expect(moveWorkspacePath('w', 'src', 'src/nested')).rejects.toBeInstanceOf(
+      PathTraversalError,
+    );
+  });
+
+  it('copy : duplique un fichier (contenu préservé)', async () => {
+    await writeWorkspaceFile('w', 'a.ts', 'export const x = 1;\n');
+    await copyWorkspacePath('w', 'a.ts', 'a copy.ts');
+    expect((await readWorkspaceFile('w', 'a copy.ts')).content).toBe('export const x = 1;\n');
+    expect((await readWorkspaceFile('w', 'a.ts')).content).toBe('export const x = 1;\n'); // original intact
+  });
+
+  it('copy : refuse un dossier dans son propre descendant', async () => {
+    await writeWorkspaceFile('w', 'dir/f.ts', '');
+    await expect(copyWorkspacePath('w', 'dir', 'dir/sub')).rejects.toBeInstanceOf(
       PathTraversalError,
     );
   });

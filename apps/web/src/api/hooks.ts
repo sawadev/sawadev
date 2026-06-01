@@ -12,6 +12,7 @@ import {
   setup,
 } from './auth';
 import {
+  copyFile,
   createDir,
   deletePath,
   getUiState,
@@ -199,6 +200,10 @@ export function useFileTreeActions(workspaceId: string) {
     }),
     rename: useMutation({
       mutationFn: ({ from, to }: { from: string; to: string }) => moveFile(workspaceId, from, to),
+      onSuccess: refresh,
+    }),
+    duplicate: useMutation({
+      mutationFn: ({ from, to }: { from: string; to: string }) => copyFile(workspaceId, from, to),
       onSuccess: refresh,
     }),
     remove: useMutation({

@@ -10,7 +10,6 @@ import { IdeStateProvider } from '../ide/IdeState';
 import { RightDock } from '../ide/RightDock';
 import { StatsChip } from '../ide/StatsChip';
 import { useIde } from '../ide/ide-context';
-import { WorkspacePreview } from '../preview/WorkspacePreview';
 import { WorkspaceTerminal } from '../terminal/Terminal';
 import { StatusDot } from '../ui';
 
@@ -18,7 +17,6 @@ const PANES: { k: string; icon: string; label: string }[] = [
   { k: 'files', icon: 'folder', label: 'Files' },
   { k: 'editor', icon: 'file', label: 'Editor' },
   { k: 'terminal', icon: 'terminal', label: 'Terminal' },
-  { k: 'preview', icon: 'globe', label: 'Preview' },
 ];
 
 /** Intermediate tablet layout: slim rail + single work pane + persistent AI panel. */
@@ -73,7 +71,6 @@ function TabletIDEBody({ workspaceId }: { workspaceId: string }) {
       </div>
     ),
     terminal: <WorkspaceTerminal workspaceId={workspaceId} />,
-    preview: <WorkspacePreview workspaceId={workspaceId} />,
   }[tab];
 
   return (
