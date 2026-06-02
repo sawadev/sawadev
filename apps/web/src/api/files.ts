@@ -63,6 +63,18 @@ export function copyFile(workspaceId: string, from: string, to: string): Promise
   return apiPost<{ ok: true }>(`/api/workspaces/${workspaceId}/file/copy`, { from, to });
 }
 
+/** Upload (octets bruts) d'un fichier vers `path` — utilisé par le drag & drop depuis l'OS. */
+export function uploadFile(workspaceId: string, path: string, file: Blob): Promise<{ ok: true }> {
+  return fetch(`/api/workspaces/${workspaceId}/file/raw?path=${encodeURIComponent(path)}`, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    body: file,
+  }).then((r) => {
+    if (!r.ok) throw new Error(`http_${r.status}`);
+    return { ok: true } as const;
+  });
+}
+
 export function deletePath(workspaceId: string, path: string): Promise<{ ok: true }> {
   return fetch(`/api/workspaces/${workspaceId}/file?path=${encodeURIComponent(path)}`, {
     method: 'DELETE',

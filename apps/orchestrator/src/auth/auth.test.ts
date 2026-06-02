@@ -153,6 +153,70 @@ describe('rate limit', () => {
   });
 });
 
+describe('change password', () => {
+  const NEW_PWD = 'new horse battery staple';
+
+  async function authedCookie(app: ReturnType<typeof createApp>) {
+    await app.request('/api/auth/setup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password: PWD }),
+    });
+    const login = await app.request('/api/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password: PWD }),
+    });
+    return sessionCookie(login) as string;
+  }
+
+  it('exige une session', async () => {
+    const app = freshApp();
+    const res = await app.request('/api/auth/password', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ currentPassword: PWD, newPassword: NEW_PWD }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('refuse un mauvais mot de passe actuel', async () => {
+    const app = freshApp();
+    const cookie = await authedCookie(app);
+    const res = await app.request('/api/auth/password', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ currentPassword: 'wrong wrong wrong', newPassword: NEW_PWD }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('met à jour le mot de passe et invalide l’ancien', async () => {
+    const app = freshApp();
+    const cookie = await authedCookie(app);
+    const ok = await app.request('/api/auth/password', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ currentPassword: PWD, newPassword: NEW_PWD }),
+    });
+    expect(ok.status).toBe(200);
+
+    const oldLogin = await app.request('/api/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password: PWD }),
+    });
+    expect(oldLogin.status).toBe(401);
+
+    const newLogin = await app.request('/api/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password: NEW_PWD }),
+    });
+    expect(newLogin.status).toBe(200);
+  });
+});
+
 describe('passkeys', () => {
   it('register/options exige une session', async () => {
     const app = freshApp();

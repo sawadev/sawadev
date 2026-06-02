@@ -1,8 +1,12 @@
-import type { ApiKeyStatus, KeyProvider, SystemVersion } from '@sawadev/shared';
+import type { ApiKeyStatus, DockerOverview, KeyProvider, SystemVersion } from '@sawadev/shared';
 import { apiGet, apiPost } from './client';
 
 export function getVersion(): Promise<SystemVersion> {
   return apiGet<SystemVersion>('/api/system/version');
+}
+
+export function getDockerOverview(): Promise<DockerOverview> {
+  return apiGet<DockerOverview>('/api/system/docker');
 }
 
 export function listKeys(): Promise<ApiKeyStatus[]> {

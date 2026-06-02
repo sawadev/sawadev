@@ -10,6 +10,8 @@ import { IOSDevice } from './device/IOSDevice';
 import { IPadDevice } from './device/IPadDevice';
 import { HIcon } from './icons';
 import { MobileDashboard, MobileIDE, MobileLogin, MobileSettings } from './mobile/pages';
+import { SecuritySettings } from './settings/SecuritySettings';
+import { DesktopDocker, MobileDocker } from './system/DockerOverview';
 import { TabletIDE } from './tablet/TabletIDE';
 import type { Device, Theme } from './types';
 
@@ -88,6 +90,12 @@ function IDEPage() {
 function SettingsPage() {
   return useUI().isMobile ? <MobileSettings /> : <DesktopSettings />;
 }
+function SecurityPage() {
+  return <SecuritySettings />;
+}
+function DockerPage() {
+  return useUI().isMobile ? <MobileDocker /> : <DesktopDocker />;
+}
 
 function AppRoutes() {
   return (
@@ -115,6 +123,22 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <SettingsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/settings/security"
+        element={
+          <RequireAuth>
+            <SecurityPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/docker"
+        element={
+          <RequireAuth>
+            <DockerPage />
           </RequireAuth>
         }
       />

@@ -38,3 +38,10 @@ export async function checkPassword(password: string): Promise<boolean> {
   if (!row) return false;
   return verifyPassword(password, row.password_hash);
 }
+
+/** Met à jour le mot de passe admin (session requise côté route). */
+export async function updatePassword(newPassword: string): Promise<void> {
+  if (!isSetupDone()) throw new Error('not_setup');
+  const hash = await hashPassword(newPassword);
+  getDb().run('UPDATE app_user SET password_hash = ? WHERE id = 1', [hash]);
+}

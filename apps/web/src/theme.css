@@ -658,6 +658,7 @@ body {
 
 /* ── Dock de droite (sélecteur de modules) ── */
 .dock-tab {
+  position: relative;
   width: 34px;
   height: 34px;
   flex-shrink: 0;
@@ -677,6 +678,540 @@ body {
 .dock-tab[data-on] {
   background: var(--accent-soft);
   color: var(--accent-text);
+}
+
+/* ── Modules du dock (cartes, badges, console) ── */
+.mod-card {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+}
+.sbadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.out-view {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--term-bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+  overflow: auto;
+}
+.ansi-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Module AI Agent (chat) ── */
+.chat-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px;
+}
+.chat-row {
+  display: flex;
+}
+.chat-row.me {
+  justify-content: flex-end;
+}
+.chat-bubble {
+  max-width: 100%;
+  min-width: 0;
+  padding: 6px 9px;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  word-break: break-word;
+}
+/* Réponses de l'agent : pleine largeur, sans cadre (densité). */
+.chat-row:not(.me) .chat-bubble {
+  width: 100%;
+}
+.chat-bubble.me {
+  max-width: 88%;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+}
+.chat-code {
+  clear: left;
+  margin: 5px 0;
+  padding: 7px 9px;
+  background: var(--term-bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre;
+}
+/* Aperçu d'un fichier .md dans l'éditeur (mode document). */
+.md-doc {
+  max-width: 760px;
+  margin: 0 auto;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.md-doc .md h1 {
+  font-size: 22px;
+}
+.md-doc .md h2 {
+  font-size: 18px;
+}
+.md-doc .md h3 {
+  font-size: 15.5px;
+}
+.md-doc .md h1,
+.md-doc .md h2 {
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: 18px 0 8px;
+}
+
+/* Rendu markdown des réponses d'agent (compact). */
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin: 10px 0 4px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.md h1 {
+  font-size: 16px;
+}
+.md h2 {
+  font-size: 14.5px;
+}
+.md h3 {
+  font-size: 13.5px;
+}
+.md h4 {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.md p {
+  margin: 6px 0;
+}
+.md ul,
+.md ol {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+.md li {
+  margin: 2px 0;
+}
+.md li::marker {
+  color: var(--faint);
+}
+.md code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--hover);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.md a {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0;
+}
+.md blockquote {
+  margin: 6px 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+  color: var(--text-2);
+}
+.md-table {
+  clear: left;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 8px 0;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.md-table th,
+.md-table td {
+  border: 1px solid var(--border);
+  padding: 4px 9px;
+  vertical-align: top;
+}
+.md-table th {
+  background: var(--surface-2);
+  font-weight: 700;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.md-table tr:nth-child(even) td {
+  background: var(--hover);
+}
+
+.chat-composer {
+  flex-shrink: 0;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.chat-input {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 6px 6px 6px 10px;
+}
+.chat-input:focus-within {
+  border-color: var(--accent-line);
+}
+.chat-input textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  max-height: 120px;
+  line-height: 1.5;
+  padding: 4px 0;
+}
+
+/* ── Module Services (catalogue) ── */
+.svc-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+.svc-cat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.12s, transform 0.12s var(--ease);
+}
+.svc-cat-card:hover {
+  border-color: var(--accent-line);
+}
+.svc-cat-card:active {
+  transform: scale(0.98);
+}
+
+/* ── Module Git ── */
+.git-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 4px 4px 2px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+.git-row:hover {
+  background: var(--hover);
+}
+.git-badge {
+  width: 16px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.git-path {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+}
+.git-name {
+  font-size: 12.5px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.git-dir {
+  font-size: 11px;
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.git-link {
+  border: none;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+.git-branch {
+  cursor: pointer;
+  padding: 7px 8px;
+}
+.git-branch[data-on] {
+  background: var(--accent-soft);
+}
+.git-branch:disabled {
+  cursor: default;
+}
+.git-commit {
+  padding: 7px 8px;
+  border-radius: 7px;
+}
+.git-commit:hover {
+  background: var(--hover);
+}
+.git-diff-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+.git-diff-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.git-diff-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.git-diff {
+  margin: 0;
+  padding: 8px 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.git-diff .dl {
+  padding: 0 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-2);
+}
+.git-diff .dl.add {
+  background: var(--diff-add);
+  color: var(--text);
+}
+.git-diff .dl.del {
+  background: var(--diff-del);
+  color: var(--text);
+}
+.git-diff .dl.hunk {
+  color: var(--accent-text);
+}
+
+/* ── Infobulle (tooltip) custom ── */
+.ttip {
+  position: absolute;
+  z-index: 50;
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 7px;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.ttip[data-place='bottom'] {
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.96);
+}
+.ttip[data-place='left'] {
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%) scale(0.96);
+}
+/* Apparition après un court délai au survol/focus ; disparition immédiate. */
+button:hover > .ttip,
+button:focus-visible > .ttip {
+  opacity: 1;
+  transition-delay: 0.35s;
+}
+button:hover > .ttip[data-place='bottom'],
+button:focus-visible > .ttip[data-place='bottom'] {
+  transform: translateX(-50%) scale(1);
+}
+button:hover > .ttip[data-place='left'],
+button:focus-visible > .ttip[data-place='left'] {
+  transform: translateY(-50%) scale(1);
+}
+
+/* Petit tag d'id (gris clair). */
+.id-tag {
+  align-self: flex-start;
+  font-size: 10.5px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 16%, transparent);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+/* ── Barre d'onglets du terminal (multi-onglets) ── */
+.term-tabs {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.term-tabs::-webkit-scrollbar {
+  display: none;
+}
+.term-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 7px 0 10px;
+  max-width: 180px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  color: var(--faint);
+  cursor: pointer;
+  user-select: none;
+  font-size: 11.5px;
+}
+.term-tab:hover {
+  background: var(--hover);
+  color: var(--text-2);
+}
+.term-tab[data-on] {
+  background: var(--term-bg);
+  color: var(--text);
+}
+.term-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.term-tab-edit {
+  font: inherit;
+  font-size: 11.5px;
+  width: 92px;
+  border: 1px solid var(--accent-line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  padding: 1px 4px;
+}
+.term-tab-x {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px;
+  opacity: 0;
+}
+.term-tab:hover .term-tab-x,
+.term-tab[data-on] .term-tab-x {
+  opacity: 1;
+}
+.term-tab-x:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.term-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.term-add,
+.term-tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.term-add {
+  width: 30px;
+  flex-shrink: 0;
+}
+.term-tool {
+  width: 26px;
+  height: 26px;
+}
+.term-add:hover,
+.term-tool:hover {
+  background: var(--hover);
+  color: var(--text-2);
+}
+.term-tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.term-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ── Modal (config workspace) ── */
@@ -711,6 +1246,20 @@ body {
   border-radius: var(--r-md);
   padding: 14px;
   background: color-mix(in srgb, var(--danger) 6%, transparent);
+}
+.danger-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--danger);
 }
 .modal-input {
   width: 100%;

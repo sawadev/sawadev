@@ -1,3 +1,6 @@
+import type { AgentProvider } from './keys';
+import type { TerminalTab } from './terminal';
+
 /** Position de vue d'un fichier dans l'éditeur (scroll + curseur/sélection). */
 export interface EditorViewState {
   /** scrollTop en px du conteneur de l'éditeur. */
@@ -22,4 +25,10 @@ export interface WorkspaceUiState {
   selected: { path: string; type: 'file' | 'dir' } | null;
   /** Position de vue par fichier. */
   view: Record<string, EditorViewState>;
+  /** Onglets terminal ouverts (1 onglet = 1 session tmux). */
+  terminals?: TerminalTab[];
+  /** Onglet terminal actif. */
+  activeTerminal?: string | null;
+  /** Fournisseur d'agent choisi pour le chat (mémorisé par workspace). */
+  agentProvider?: AgentProvider | null;
 }

@@ -32,3 +32,21 @@ export function apiPost<T>(path: string, body?: unknown): Promise<T> {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   }).then((r) => parse<T>(r));
 }
+
+export function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  return fetch(path, {
+    method: 'PATCH',
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then((r) => parse<T>(r));
+}
+
+export function apiPut<T>(path: string, body: unknown): Promise<T> {
+  return fetch(path, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then((r) => parse<T>(r));
+}

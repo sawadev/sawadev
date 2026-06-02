@@ -22,6 +22,13 @@ export function logout(): Promise<{ ok: true }> {
   return apiPost<{ ok: true }>('/api/auth/logout');
 }
 
+export function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: true }> {
+  return apiPost<{ ok: true }>('/api/auth/password', { currentPassword, newPassword });
+}
+
 /** Enregistre une passkey (utilisateur déjà authentifié). */
 export async function registerPasskey(label?: string): Promise<boolean> {
   const { flowId, options } = await apiPost<{

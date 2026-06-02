@@ -1,7 +1,8 @@
 /** Nature d'un fichier pour choisir le rendu (édition, image, aperçu, brut). */
-export type FileKind = 'image' | 'svg' | 'text' | 'binary';
+export type FileKind = 'image' | 'svg' | 'markdown' | 'text' | 'binary';
 
 const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'ico']);
+const MARKDOWN_EXT = new Set(['md', 'markdown']);
 
 // Binaires connus, non prévisualisables dans l'éditeur (évite d'afficher du charabia).
 const BINARY_EXT = new Set([
@@ -46,6 +47,7 @@ function ext(path: string): string {
 export function fileKind(path: string): FileKind {
   const e = ext(path);
   if (e === 'svg') return 'svg';
+  if (MARKDOWN_EXT.has(e)) return 'markdown';
   if (IMAGE_EXT.has(e)) return 'image';
   if (BINARY_EXT.has(e)) return 'binary';
   return 'text';

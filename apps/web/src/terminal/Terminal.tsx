@@ -5,9 +5,11 @@ import { useEffect, useRef } from 'react';
 import { useUI } from '../context';
 
 /** Construit l'URL WebSocket terminal ou agent (proxifiée par Vite en dev). */
-function wsUrl(workspaceId: string, kind: 'terminal' | 'agent'): string {
+function wsUrl(workspaceId: string, kind: 'terminal' | 'agent', session?: string): string {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${proto}://${location.host}/ws/${kind}/${encodeURIComponent(workspaceId)}`;
+  const base = `${proto}://${location.host}/ws/${kind}/${encodeURIComponent(workspaceId)}`;
+  // `?s=<session>` cible la session tmux d'un onglet précis (terminal multi-onglets).
+  return session ? `${base}?s=${encodeURIComponent(session)}` : base;
 }
 
 const DARK = {
@@ -37,12 +39,33 @@ const LIGHT = {
 export function WorkspaceTerminal({
   workspaceId,
   kind = 'terminal',
+  session,
+  active = true,
+  onActivity,
+  onBell,
+  clearNonce,
 }: {
   workspaceId: string;
   kind?: 'terminal' | 'agent';
+  /** Session tmux ciblée (onglet). Absent → session par défaut du workspace. */
+  session?: string;
+  /** Onglet visible : déclenche un re-fit (un onglet caché mesure 0). */
+  active?: boolean;
+  /** Appelé à chaque sortie (pour l'indicateur d'activité d'un onglet inactif). */
+  onActivity?: () => void;
+  /** Appelé sur la cloche du terminal (BEL). */
+  onBell?: () => void;
+  /** Incrémenter pour vider l'écran (Clear). */
+  clearNonce?: number;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const termRef = useRef<Xterm | null>(null);
+  const refitRef = useRef<() => void>(() => {});
   const { theme } = useUI();
+
+  // Callbacks tenus dans une ref : changent à chaque rendu sans relancer l'effet principal.
+  const cbRef = useRef({ onActivity, onBell });
+  cbRef.current = { onActivity, onBell };
 
   useEffect(() => {
     if (!host.current || !workspaceId) return;
@@ -55,6 +78,9 @@ export function WorkspaceTerminal({
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(host.current);
+    termRef.current = term;
+
+    const ws = new WebSocket(wsUrl(workspaceId, kind, session));
 
     // Ajuste les lignes/colonnes, en gardant **une ligne de marge** : le calcul du
     // FitAddon peut légèrement déborder et rogner la dernière ligne en bas de l'écran.
@@ -62,9 +88,17 @@ export function WorkspaceTerminal({
       fit.fit();
       if (term.rows > 1) term.resize(term.cols, term.rows - 1);
     };
+    const sendResize = () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+      }
+    };
+    const refit = () => {
+      fitTerm();
+      sendResize();
+    };
+    refitRef.current = refit;
     fitTerm();
-
-    const ws = new WebSocket(wsUrl(workspaceId, kind));
 
     // Copier/coller : Cmd+C/V (mac) ou Ctrl+Shift+C/V (Linux/Windows).
     // Ctrl+C seul est laissé au PTY (SIGINT).
@@ -93,39 +127,49 @@ export function WorkspaceTerminal({
       return true;
     });
 
-    const sendResize = () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-      }
-    };
-
     ws.onmessage = (ev) => {
       const msg = JSON.parse(ev.data);
-      if (msg.type === 'output') term.write(msg.data);
-      else if (msg.type === 'exit') term.write('\r\n\x1b[90m[session closed]\x1b[0m\r\n');
+      if (msg.type === 'output') {
+        term.write(msg.data);
+        cbRef.current.onActivity?.();
+      } else if (msg.type === 'exit') {
+        term.write('\r\n\x1b[90m[session closed]\x1b[0m\r\n');
+      }
     };
-    ws.onopen = () => {
-      fitTerm();
-      sendResize();
-    };
+    ws.onopen = () => refit();
 
     const onData = term.onData((data) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', data }));
     });
+    const onBellSub = term.onBell(() => cbRef.current.onBell?.());
 
-    const onResize = () => {
-      fitTerm();
-      sendResize();
-    };
+    const onResize = () => refit();
     window.addEventListener('resize', onResize);
 
     return () => {
       window.removeEventListener('resize', onResize);
       onData.dispose();
+      onBellSub.dispose();
       ws.close();
       term.dispose();
+      termRef.current = null;
+      refitRef.current = () => {};
     };
-  }, [workspaceId, theme, kind]);
+  }, [workspaceId, theme, kind, session]);
+
+  // Re-fit à l'activation : un onglet caché (display:none) mesure 0 → fit() est un no-op
+  // tant qu'il est invisible ; on recalcule une fois affiché (frame suivante).
+  useEffect(() => {
+    if (!active) return;
+    const id = requestAnimationFrame(() => refitRef.current());
+    return () => cancelAnimationFrame(id);
+  }, [active]);
+
+  // Clear : vide l'écran + le scrollback xterm.
+  useEffect(() => {
+    if (clearNonce === undefined) return;
+    termRef.current?.clear();
+  }, [clearNonce]);
 
   return (
     <div

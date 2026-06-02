@@ -20,24 +20,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ripgrep less openssh-client tmux \
     && rm -rf /var/lib/apt/lists/*
 
-# tmux : barre de statut riche (workspace · fenêtres · horloge), aux couleurs sawadev.
+# tmux : rendu natif (aucun style forcé). On garde seulement le comportement.
 RUN cat > /etc/tmux.conf <<'EOF'
 set -g history-limit 50000
 set -g mouse on
 set -g escape-time 10
-set -g status on
-set -g status-interval 5
-set -g status-justify left
-set -g status-position bottom
-set -g status-style "bg=#1c1c22,fg=#87878f"
-set -g status-left "#[bg=#7c5cf6,fg=#ffffff,bold] #S #[default] "
-set -g status-left-length 40
-set -g window-status-separator ""
-set -g window-status-format "#[fg=#87878f] #I:#W "
-set -g window-status-current-format "#[fg=#ececef,bg=#24242b,bold] #I:#W "
-set -g status-right "#[fg=#5b5b64] %H:%M "
-set -g status-right-length 16
-set -g message-style "bg=#7c5cf6,fg=#ffffff"
 EOF
 
 # Go (binaire officiel, selon l'architecture cible).
@@ -51,6 +38,20 @@ ENV PATH="/usr/local/go/bin:/root/.local/bin:${PATH}" \
 RUN npm install -g @anthropic-ai/claude-code @openai/codex
 RUN curl -fsSL https://cursor.com/install | bash || \
       echo "Cursor CLI non installé (optionnel) — installable plus tard."
+
+# Serveur MCP sawadev (stdio) : donne aux agents les capacités managées de
+# l'orchestrateur (Quick Actions, Services, Ports, Git). L'URL + le token du
+# workspace sont injectés par l'orchestrateur en variables d'env au lancement.
+COPY mcp/ /opt/sawadev-mcp/
+RUN cd /opt/sawadev-mcp && npm install --omit=dev \
+ && printf '#!/bin/sh\nexec node /opt/sawadev-mcp/index.mjs "$@"\n' > /usr/local/bin/sawadev-mcp \
+ && chmod +x /usr/local/bin/sawadev-mcp
+
+# Configs agents : serveur MCP « sawadev » disponible par défaut.
+RUN mkdir -p /root/.cursor /root/.codex \
+ && printf '{\n  "mcpServers": {\n    "sawadev": { "command": "sawadev-mcp" }\n  }\n}\n' > /root/.claude.json \
+ && printf '{\n  "mcpServers": {\n    "sawadev": { "command": "sawadev-mcp" }\n  }\n}\n' > /root/.cursor/mcp.json \
+ && printf '[mcp_servers.sawadev]\ncommand = "sawadev-mcp"\n' > /root/.codex/config.toml
 
 # Les sessions terminal/agent ouvrent un shell de login (bash -l), qui
 # réinitialise le PATH via /etc/profile. On y réinjecte Go et ~/.local/bin

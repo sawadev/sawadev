@@ -101,4 +101,77 @@ export const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    id: 6,
+    name: 'quick_actions',
+    sql: /* sql */ `
+      CREATE TABLE quick_actions (
+        id           TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        label        TEXT NOT NULL,
+        command      TEXT NOT NULL,
+        created_at   INTEGER NOT NULL
+      );
+
+      CREATE TABLE action_runs (
+        id         TEXT PRIMARY KEY,
+        action_id  TEXT NOT NULL REFERENCES quick_actions(id) ON DELETE CASCADE,
+        status     TEXT NOT NULL,            -- active | done | failed
+        exit_code  INTEGER,
+        output     TEXT NOT NULL DEFAULT '',
+        started_at INTEGER NOT NULL,
+        ended_at   INTEGER
+      );
+
+      CREATE INDEX idx_action_runs_action ON action_runs(action_id, started_at);
+    `,
+  },
+  {
+    id: 7,
+    name: 'tools',
+    sql: /* sql */ `
+      CREATE TABLE tools (
+        id           TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        type         TEXT NOT NULL,
+        name         TEXT NOT NULL,
+        status       TEXT NOT NULL,            -- running | stopped
+        conn_json    TEXT NOT NULL,            -- JSON ToolConnection
+        created_at   INTEGER NOT NULL
+      );
+    `,
+  },
+  {
+    id: 8,
+    name: 'agent_messages',
+    sql: /* sql */ `
+      CREATE TABLE agent_messages (
+        id           TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        role         TEXT NOT NULL,            -- user | assistant
+        text         TEXT NOT NULL,
+        created_at   INTEGER NOT NULL
+      );
+
+      CREATE INDEX idx_agent_messages_ws ON agent_messages(workspace_id, created_at);
+    `,
+  },
+  {
+    id: 9,
+    name: 'agent_messages_provider',
+    sql: /* sql */ `
+      ALTER TABLE agent_messages ADD COLUMN provider TEXT;
+    `,
+  },
+  {
+    id: 10,
+    name: 'mcp_tokens',
+    sql: /* sql */ `
+      CREATE TABLE mcp_tokens (
+        workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+        token        TEXT NOT NULL UNIQUE,
+        created_at   INTEGER NOT NULL
+      );
+    `,
+  },
 ];

@@ -11,6 +11,8 @@ services:
       - "80:80"
       - "443:443"
     environment:
+      # Domaine de base, requis par le Caddyfile ({$DOMAIN}).
+      DOMAIN: ${DOMAIN}
       # Token API Cloudflare pour le DNS-01 wildcard.
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
     volumes:

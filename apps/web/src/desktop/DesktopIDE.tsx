@@ -10,7 +10,7 @@ import { PanelResizer } from '../ide/PanelResizer';
 import { RightDock } from '../ide/RightDock';
 import { StatsChip } from '../ide/StatsChip';
 import { useIde } from '../ide/ide-context';
-import { WorkspaceTerminal } from '../terminal/Terminal';
+import { TerminalPanel } from '../terminal/TerminalPanel';
 import { StatusDot } from '../ui';
 import { DeskRail } from './DesktopShell';
 
@@ -40,22 +40,38 @@ function DTerm({ workspaceId }: { workspaceId: string }) {
       return 220;
     }
   });
+  const [maximized, setMaximized] = useState(false);
+  const restoreHeight = useRef(height);
 
-  // Persiste la hauteur et refait le fit du terminal xterm (qui n'écoute que les
-  // resize de fenêtre) à chaque changement de hauteur.
+  // Persiste la hauteur (sauf en mode plein) et refait le fit du terminal xterm
+  // (qui n'écoute que les resize de fenêtre) à chaque changement de hauteur.
   useEffect(() => {
-    try {
-      localStorage.setItem(TERM_HEIGHT_KEY, String(height));
-    } catch {
-      // ignore
+    if (!maximized) {
+      try {
+        localStorage.setItem(TERM_HEIGHT_KEY, String(height));
+      } catch {
+        // ignore
+      }
     }
     window.dispatchEvent(new Event('resize'));
-  }, [height]);
+  }, [height, maximized]);
 
   // Panneau ancré en bas : la hauteur = distance du curseur au bas de la fenêtre.
   const onResize = (clientY: number) => {
+    if (maximized) setMaximized(false);
     const max = Math.max(TERM_MIN, window.innerHeight - 220);
     setHeight(Math.max(TERM_MIN, Math.min(max, window.innerHeight - clientY)));
+  };
+
+  const toggleMaximize = () => {
+    if (maximized) {
+      setMaximized(false);
+      setHeight(restoreHeight.current);
+    } else {
+      restoreHeight.current = height;
+      setMaximized(true);
+      setHeight(Math.max(TERM_MIN, window.innerHeight - 120));
+    }
   };
 
   return (
@@ -71,25 +87,11 @@ function DTerm({ workspaceId }: { workspaceId: string }) {
       }}
     >
       <PanelResizer side="top" onResize={onResize} ariaLabel="Resize terminal panel" />
-      <div
-        style={{
-          height: 34,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 7,
-          padding: '0 14px',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--surface)',
-        }}
-      >
-        <HIcon name="terminal" size={12} color="var(--text-2)" />
-        <span className="mono" style={{ fontSize: 11.5, color: 'var(--text)', fontWeight: 600 }}>
-          Terminal
-        </span>
-      </div>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <WorkspaceTerminal workspaceId={workspaceId} />
-      </div>
+      <TerminalPanel
+        workspaceId={workspaceId}
+        maximized={maximized}
+        onToggleMaximize={toggleMaximize}
+      />
     </div>
   );
 }
@@ -107,7 +109,8 @@ export function DesktopIDE() {
 function DesktopIDEBody({ workspaceId }: { workspaceId: string }) {
   const files = useIde();
   const { data: workspaces = [] } = useWorkspaces();
-  const status = workspaces.find((w) => w.id === workspaceId)?.status;
+  const ws = workspaces.find((w) => w.id === workspaceId);
+  const status = ws?.status;
   const running = status === 'running';
   const start = useStartWorkspace();
   const treeRef = useRef<HTMLDivElement>(null);
@@ -160,7 +163,20 @@ function DesktopIDEBody({ workspaceId }: { workspaceId: string }) {
             borderBottom: '1px solid var(--border)',
           }}
         >
-          <span className="mono" style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              flex: 1,
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {ws?.name ?? workspaceId}
+          </span>
+          <span className="mono id-tag" style={{ alignSelf: 'center' }}>
             {workspaceId}
           </span>
         </div>

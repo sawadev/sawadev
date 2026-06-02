@@ -13,6 +13,12 @@ export interface PasswordRequest {
   password: string;
 }
 
+/** Corps de POST /api/auth/password (changement de mot de passe, session requise). */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 /** Réponse générique d'une action d'auth réussie. */
 export interface AuthResult {
   authenticated: true;

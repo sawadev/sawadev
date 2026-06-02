@@ -1,4 +1,4 @@
-import type { EditorViewState } from '@sawadev/shared';
+import type { AgentProvider, EditorViewState, TerminalTab } from '@sawadev/shared';
 import { createContext, useContext } from 'react';
 
 export type NodeType = 'file' | 'dir';
@@ -29,6 +29,18 @@ export interface IdeApi {
   // Position de vue par fichier.
   getView: (path: string) => EditorViewState | undefined;
   setView: (path: string, vs: EditorViewState) => void;
+  // Terminaux (1 onglet = 1 session tmux).
+  terminals: TerminalTab[];
+  activeTerminal: string | null;
+  /** Crée un onglet (ou réattache `id` existant pour rouvrir une session orpheline). */
+  addTerminal: (id?: string) => void;
+  /** Ferme l'onglet (détache : la session tmux survit, réouvrable). */
+  closeTerminal: (id: string) => void;
+  renameTerminal: (id: string, name: string) => void;
+  setActiveTerminal: (id: string) => void;
+  // Fournisseur d'agent (chat), mémorisé par workspace.
+  agentProvider: AgentProvider | null;
+  setAgentProvider: (p: AgentProvider) => void;
 }
 
 export const IdeCtx = createContext<IdeApi | null>(null);

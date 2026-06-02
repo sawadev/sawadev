@@ -14,8 +14,10 @@ import {
   Pencil,
   Plus,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { uploadFile } from '../api/files';
 import { useFileTreeActions, useFiles } from '../api/hooks';
 import { useIde } from '../ide/ide-context';
 import { Menu, type MenuItem } from '../ui/Menu';
@@ -50,6 +52,38 @@ function copyName(name: string, existing: Set<string>): string {
   return candidate;
 }
 
+/** Le drag transporte-t-il des fichiers de l'OS (import) plutôt qu'un nœud de l'arbre ? */
+const isFileDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
+
+/** Aplati récursivement une entrée déposée (fichier ou dossier) en { chemin relatif, fichier }. */
+function collectEntries(
+  entry: FileSystemEntry,
+  prefix: string,
+): Promise<{ path: string; file: File }[]> {
+  if (entry.isFile) {
+    return new Promise((resolve, reject) =>
+      (entry as FileSystemFileEntry).file(
+        (file) => resolve([{ path: prefix + entry.name, file }]),
+        reject,
+      ),
+    );
+  }
+  if (entry.isDirectory) {
+    const reader = (entry as FileSystemDirectoryEntry).createReader();
+    return new Promise((resolve, reject) => {
+      const out: { path: string; file: File }[] = [];
+      const readBatch = () =>
+        reader.readEntries(async (batch) => {
+          if (!batch.length) return resolve(out);
+          for (const e of batch) out.push(...(await collectEntries(e, `${prefix}${entry.name}/`)));
+          readBatch();
+        }, reject);
+      readBatch();
+    });
+  }
+  return Promise.resolve([]);
+}
+
 interface Ctx {
   workspaceId: string;
   currentPath: string | null;
@@ -66,6 +100,7 @@ interface Ctx {
   cancel: () => void;
   setDropDir: (d: string | null) => void;
   move: (destDir: string) => void;
+  upload: (destDir: string, dt: DataTransfer) => void;
 }
 const TreeCtx = createContext<Ctx | null>(null);
 function useTree(): Ctx {
@@ -139,9 +174,54 @@ export function FileTree({ workspaceId, currentPath, onOpen }: TreeProps) {
     if (destDir) expand(destDir);
   };
 
+  // Téléverse une liste de { chemin relatif, fichier } dans `destDir`.
+  const runUpload = async (destDir: string, entries: { path: string; file: File }[]) => {
+    if (!entries.length) return;
+    if (destDir) expand(destDir);
+    for (const { path, file } of entries) {
+      await uploadFile(workspaceId, join(destDir, path), file).catch(() => undefined);
+    }
+    qc.invalidateQueries({ queryKey: ['files', workspaceId] });
+  };
+
+  // Import depuis l'OS (drag & drop de fichiers/dossiers). On capture les entrées
+  // SYNCHRONEMENT (webkitGetAsEntry n'est valide que pendant l'événement), puis on
+  // traverse et téléverse en arrière-plan.
+  const upload = (destDir: string, dt: DataTransfer) => {
+    setDropDir(null);
+    const roots = Array.from(dt.items)
+      .map((it) => (it.kind === 'file' ? it.webkitGetAsEntry() : null))
+      .filter((x): x is FileSystemEntry => x !== null);
+    const flat = Array.from(dt.files);
+    void (async () => {
+      let entries: { path: string; file: File }[] = [];
+      if (roots.length) {
+        for (const r of roots) entries.push(...(await collectEntries(r, '')));
+      } else {
+        entries = flat.map((f) => ({ path: f.name, file: f }));
+      }
+      await runUpload(destDir, entries);
+    })();
+  };
+
+  // Import via sélecteur de fichiers natif (entrée « Import… » des menus).
+  const importDir = useRef('');
+  const fileInput = useRef<HTMLInputElement>(null);
+  const triggerImport = (dir: string) => {
+    importDir.current = dir;
+    fileInput.current?.click();
+  };
+  const onPickFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    const entries = files.map((f) => ({ path: f.webkitRelativePath || f.name, file: f }));
+    void runUpload(importDir.current, entries);
+    e.target.value = ''; // permet de ré-importer le même fichier
+  };
+
   const newItems = (dir: string): MenuItem[] => [
     { label: 'New file', icon: <FilePlus size={14} />, onClick: () => startCreate(dir, 'file') },
     { label: 'New folder', icon: <FolderPlus size={14} />, onClick: () => startCreate(dir, 'dir') },
+    { label: 'Import…', icon: <Upload size={14} />, onClick: () => triggerImport(dir) },
   ];
   const itemsFor = (target: Selected | 'root'): MenuItem[] => {
     if (target === 'root') return newItems('');
@@ -220,10 +300,18 @@ export function FileTree({ workspaceId, currentPath, onOpen }: TreeProps) {
     cancel,
     setDropDir,
     move,
+    upload,
   };
 
   return (
     <TreeCtx.Provider value={ctx}>
+      <input
+        ref={fileInput}
+        type="file"
+        multiple
+        onChange={onPickFiles}
+        style={{ display: 'none' }}
+      />
       <div style={{ fontSize: 13.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div className="ft-toolbar">
           <span className="ft-title">FILES</span>
@@ -244,14 +332,15 @@ export function FileTree({ workspaceId, currentPath, onOpen }: TreeProps) {
           onClick={() => setSelected(null)}
           onContextMenu={(e) => openContext(e, 'root')}
           onDragOver={(e) => {
-            if (dragRef.current) {
+            if (dragRef.current || isFileDrag(e)) {
               e.preventDefault();
               setDropDir('');
             }
           }}
           onDrop={(e) => {
             e.preventDefault();
-            move('');
+            if (isFileDrag(e)) upload('', e.dataTransfer);
+            else move('');
           }}
         >
           <DirContents dir="" depth={0} />
@@ -346,7 +435,7 @@ function Row({
         t.setDropDir(null);
       }}
       onDragOver={(e) => {
-        if (t.dragRef.current) {
+        if (t.dragRef.current || isFileDrag(e)) {
           e.preventDefault();
           e.stopPropagation();
           t.setDropDir(destDir);
@@ -355,7 +444,8 @@ function Row({
       onDrop={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        t.move(destDir);
+        if (isFileDrag(e)) t.upload(destDir, e.dataTransfer);
+        else t.move(destDir);
       }}
       onContextMenu={(e) => t.openContext(e, { path: node.path, type })}
     >

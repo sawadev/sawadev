@@ -11,7 +11,11 @@ import {
   readWorkspaceFile,
   resolveWorkspaceFilePath,
   writeWorkspaceFile,
+  writeWorkspaceFileBytes,
 } from './service';
+
+/** Taille max d'un fichier uploadé (anti-abus). */
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
 /** Convertit les erreurs du service fichiers en réponses HTTP. */
 function fail(c: Context, err: unknown) {
@@ -65,6 +69,20 @@ export function fileRoutes(): Hono {
     if (typeof body?.content !== 'string') return c.json({ error: 'invalid_body' }, 400);
     try {
       await writeWorkspaceFile(c.req.param('id'), path, body.content);
+      return c.json({ ok: true });
+    } catch (err) {
+      return fail(c, err);
+    }
+  });
+
+  // Upload de fichier (octets bruts) : drag & drop depuis l'OS, tout type de fichier.
+  app.put('/:id/file/raw', async (c) => {
+    const path = c.req.query('path');
+    if (!path) return c.json({ error: 'missing_path' }, 400);
+    try {
+      const bytes = new Uint8Array(await c.req.arrayBuffer());
+      if (bytes.byteLength > MAX_UPLOAD_BYTES) return c.json({ error: 'file_too_large' }, 413);
+      await writeWorkspaceFileBytes(c.req.param('id'), path, bytes);
       return c.json({ ok: true });
     } catch (err) {
       return fail(c, err);

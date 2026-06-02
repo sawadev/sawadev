@@ -1,19 +1,11 @@
-import type { KeyProvider } from '@sawadev/shared';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import {
-  useApiKeys,
   useAuthState,
   useCreateWorkspace,
-  useDeleteApiKey,
-  useDeletePasskey,
   useLogin,
   useLoginWithPasskey,
-  useLogout,
-  usePasskeys,
-  useRegisterPasskey,
-  useSetApiKey,
   useSetup,
   useStartWorkspace,
   useStopWorkspace,
@@ -23,7 +15,8 @@ import {
 import { useUI } from '../context';
 import { ACCENTS } from '../data';
 import { HIcon } from '../icons';
-import { PROVIDER_LABEL } from '../providers';
+import { ApiKeysSection } from '../settings/ApiKeysSection';
+import { SignOutSection } from '../settings/SignOutSection';
 import { Logo, StatusDot } from '../ui';
 import { WorkspaceConfig } from '../ui/WorkspaceConfig';
 import { stackLabel, workspaceIcon } from '../workspace-display';
@@ -326,26 +319,25 @@ export function DesktopWorkspaces() {
                     <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
                       {w.name}
                     </div>
-                    <div
-                      className="mono"
-                      style={{ fontSize: 11.5, color: 'var(--faint)', marginTop: 2 }}
-                    >
-                      {w.id}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 3 }}>
+                      <span className="mono id-tag">{w.id}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <StatusDot on={on} live={on} />
+                        <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
+                          {w.status}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span className="chip chip-sm">{stackLabel(w.image)}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <StatusDot on={on} live={on} />
-                    <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
-                      {w.status}
-                    </span>
-                  </div>
                   <div style={{ flex: 1 }} />
                   <button
                     type="button"
-                    className="btn btn-soft btn-sm"
+                    className="btn btn-soft btn-icon btn-sm"
+                    title={on ? 'Stop' : 'Start'}
+                    aria-label={on ? 'Stop workspace' : 'Start workspace'}
                     disabled={
                       (startM.isPending && startM.variables === w.id) ||
                       (stopM.isPending && stopM.variables === w.id)
@@ -361,16 +353,9 @@ export function DesktopWorkspaces() {
                   >
                     <HIcon
                       name={on ? 'stop' : 'play'}
-                      size={13}
+                      size={14}
                       color={on ? 'var(--danger)' : 'var(--good)'}
                     />
-                    {on
-                      ? stopM.isPending && stopM.variables === w.id
-                        ? 'Stopping…'
-                        : 'Stop'
-                      : startM.isPending && startM.variables === w.id
-                        ? 'Starting…'
-                        : 'Start'}
                   </button>
                 </div>
               </div>
@@ -387,23 +372,16 @@ export function DesktopWorkspaces() {
 export function DesktopSettings() {
   const nav = useNavigate();
   const { theme, toggleTheme, accent, setAccent } = useUI();
-  const { data: authState } = useAuthState();
-  const { data: keys = [] } = useApiKeys();
   const { data: version } = useVersion();
-  const logoutM = useLogout();
-  const registerPasskeyM = useRegisterPasskey();
-  const setKeyM = useSetApiKey();
-  const deleteKeyM = useDeleteApiKey();
-  const { data: passkeys = [] } = usePasskeys();
-  const deletePasskeyM = useDeletePasskey();
-  const doLogout = () => logoutM.mutate(undefined, { onSuccess: () => nav('/login') });
-  const doRegisterPasskey = () => registerPasskeyM.mutate(undefined);
-  const addKey = (provider: (typeof keys)[number]['provider']) => {
-    const key = window.prompt(`Paste your ${PROVIDER_LABEL[provider]} API key`);
-    if (key?.trim()) setKeyM.mutate({ provider, key: key.trim() });
-  };
+  const sectionLabel = {
+    fontSize: 12.5,
+    fontWeight: 700,
+    color: 'var(--muted)',
+    margin: '26px 2px 10px',
+    letterSpacing: 0.3,
+  } as const;
   const server: [string, string, string][] = [
-    ['shield', 'Security', 'Password, passkeys, sessions'],
+    ['shield', 'Security', 'Password, passkeys'],
     ['globe', 'Domain & DNS', `${version?.channel ?? 'stable'} channel`],
     ['cpu', 'Version', `current ${version?.current ?? '—'}`],
   ];
@@ -472,77 +450,7 @@ export function DesktopSettings() {
           </div>
         </div>
 
-        <div
-          style={{
-            fontSize: 12.5,
-            fontWeight: 700,
-            color: 'var(--muted)',
-            margin: '26px 2px 10px',
-            letterSpacing: 0.3,
-          }}
-        >
-          AI AGENTS & API KEYS
-        </div>
-        <div className="card" style={{ overflow: 'hidden' }}>
-          {keys.map((k, i) => (
-            <div
-              key={k.provider}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '15px 18px',
-                borderTop: i ? '1px solid var(--border-soft)' : 'none',
-              }}
-            >
-              <div
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 9,
-                  background: 'var(--elevated)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <HIcon name="sparkleSm" size={17} color="var(--muted)" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{PROVIDER_LABEL[k.provider]}</div>
-                <div
-                  className="mono"
-                  style={{
-                    fontSize: 11,
-                    color: k.connected ? 'var(--text-2)' : 'var(--faint)',
-                    marginTop: 2,
-                  }}
-                >
-                  {k.connected ? 'key set · encrypted' : 'no key set'}
-                </div>
-              </div>
-              {k.connected ? (
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={() => deleteKeyM.mutate(k.provider)}
-                >
-                  <HIcon name="trash" size={13} color="var(--danger)" />
-                  Remove
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={() => addKey(k.provider)}
-                >
-                  <HIcon name="key" size={13} color="var(--text)" />
-                  Add
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
+        <ApiKeysSection labelStyle={sectionLabel} />
 
         <div
           style={{
@@ -557,15 +465,23 @@ export function DesktopSettings() {
         </div>
         <div className="card" style={{ overflow: 'hidden' }}>
           {server.map((r, i) => (
-            <div
-              key={i}
+            <button
+              key={r[1]}
+              type="button"
+              onClick={i === 0 ? () => nav('/settings/security') : undefined}
               style={{
+                width: '100%',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
                 padding: '15px 18px',
+                cursor: i === 0 ? 'pointer' : 'default',
+                background: 'transparent',
+                border: 'none',
                 borderTop: i ? '1px solid var(--border-soft)' : 'none',
-                cursor: 'pointer',
+                textAlign: 'left',
+                font: 'inherit',
+                color: 'inherit',
               }}
             >
               <div
@@ -586,98 +502,11 @@ export function DesktopSettings() {
                 <div style={{ fontSize: 12, color: 'var(--faint)', marginTop: 1 }}>{r[2]}</div>
               </div>
               <HIcon name="chevR" size={17} color="var(--faint)" />
-            </div>
+            </button>
           ))}
         </div>
 
-        <div
-          style={{
-            fontSize: 12.5,
-            fontWeight: 700,
-            color: 'var(--muted)',
-            margin: '26px 2px 10px',
-            letterSpacing: 0.3,
-          }}
-        >
-          ACCOUNT
-        </div>
-        <div className="card" style={{ overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '15px 18px' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Passkey</div>
-              <div style={{ fontSize: 12, color: 'var(--faint)', marginTop: 1 }}>
-                {authState?.hasPasskey
-                  ? 'A passkey is registered on this account'
-                  : 'Add a passkey for faster sign-in (Face ID, Touch ID…)'}
-              </div>
-            </div>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={doRegisterPasskey}
-              disabled={registerPasskeyM.isPending}
-            >
-              <HIcon name="finger" size={14} color="var(--text)" />
-              {registerPasskeyM.isPending ? 'Registering…' : 'Add passkey'}
-            </button>
-          </div>
-          {passkeys.map((pk) => (
-            <div
-              key={pk.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '12px 18px',
-                borderTop: '1px solid var(--border-soft)',
-              }}
-            >
-              <HIcon name="finger" size={16} color="var(--muted)" />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 500 }}>{pk.label || 'Passkey'}</div>
-                <div className="mono" style={{ fontSize: 11, color: 'var(--faint)', marginTop: 1 }}>
-                  {pk.id.slice(0, 16)}…
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                title="Remove passkey"
-                onClick={() => {
-                  if (window.confirm('Remove this passkey?')) deletePasskeyM.mutate(pk.id);
-                }}
-              >
-                <HIcon name="trash" size={14} color="var(--danger)" />
-              </button>
-            </div>
-          ))}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '15px 18px',
-              borderTop: '1px solid var(--border-soft)',
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Sign out</div>
-              <div style={{ fontSize: 12, color: 'var(--faint)', marginTop: 1 }}>
-                End this session on the current device
-              </div>
-            </div>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              style={{ color: 'var(--danger)', borderColor: 'var(--danger-line)' }}
-              onClick={doLogout}
-              disabled={logoutM.isPending}
-            >
-              <HIcon name="logout" size={14} color="var(--danger)" />
-              Log out
-            </button>
-          </div>
-        </div>
+        <SignOutSection labelStyle={sectionLabel} />
       </div>
     </DeskFrame>
   );

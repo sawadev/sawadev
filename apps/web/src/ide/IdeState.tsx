@@ -1,4 +1,9 @@
-import type { EditorViewState, WorkspaceUiState } from '@sawadev/shared';
+import type {
+  AgentProvider,
+  EditorViewState,
+  TerminalTab,
+  WorkspaceUiState,
+} from '@sawadev/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { putUiState } from '../api/files';
@@ -12,8 +17,25 @@ interface Persisted {
   preview: string | null;
   expanded: string[];
   selected: Selected | null;
+  terminals: TerminalTab[];
+  activeTerminal: string | null;
+  agentProvider: AgentProvider | null;
 }
-const EMPTY: Persisted = { tabs: [], active: null, preview: null, expanded: [], selected: null };
+const EMPTY: Persisted = {
+  tabs: [],
+  active: null,
+  preview: null,
+  expanded: [],
+  selected: null,
+  terminals: [],
+  activeTerminal: null,
+  agentProvider: null,
+};
+
+/** Id d'onglet terminal sûr (charset `[0-9a-f-]`, suffixe de session tmux). */
+function newTermId(): string {
+  return crypto.randomUUID().slice(0, 8);
+}
 
 const SAVE_DEBOUNCE_MS = 600;
 
@@ -44,12 +66,19 @@ export function IdeStateProvider({
   // Hydratation unique depuis le serveur.
   useEffect(() => {
     if (hydrated.current || !data) return;
+    // Garantit ≥ 1 terminal au chargement (sinon onglet « Terminal 1 » par défaut).
+    const terminals = data.terminals?.length
+      ? data.terminals
+      : [{ id: newTermId(), name: 'Terminal 1' }];
     setState({
       tabs: data.tabs ?? [],
       active: data.active ?? null,
       preview: data.preview ?? null,
       expanded: data.expanded ?? [],
       selected: data.selected ?? null,
+      terminals,
+      activeTerminal: data.activeTerminal ?? terminals[0]?.id ?? null,
+      agentProvider: data.agentProvider ?? null,
     });
     viewRef.current = data.view ?? {};
     hydrated.current = true;
@@ -66,6 +95,9 @@ export function IdeStateProvider({
       expanded: s.expanded,
       selected: s.selected,
       view: viewRef.current,
+      terminals: s.terminals,
+      activeTerminal: s.activeTerminal,
+      agentProvider: s.agentProvider,
     };
     // Garde le cache react-query à jour → un retour de navigation réhydrate le dernier
     // état (sans GET). Reload / autre appareil refont un GET serveur (état persisté).
@@ -84,7 +116,17 @@ export function IdeStateProvider({
   // biome-ignore lint/correctness/useExhaustiveDependencies: déclencheurs explicites
   useEffect(() => {
     schedule();
-  }, [state.tabs, state.active, state.preview, state.expanded, state.selected, schedule]);
+  }, [
+    state.tabs,
+    state.active,
+    state.preview,
+    state.expanded,
+    state.selected,
+    state.terminals,
+    state.activeTerminal,
+    state.agentProvider,
+    schedule,
+  ]);
 
   // Flush immédiat au démontage (navigation / changement de workspace).
   useEffect(
@@ -164,6 +206,48 @@ export function IdeStateProvider({
     [],
   );
 
+  // ── Terminaux ──
+  const addTerminal = useCallback(
+    (id?: string) =>
+      setState((s) => {
+        const tid = id ?? newTermId();
+        if (s.terminals.some((t) => t.id === tid)) return { ...s, activeTerminal: tid };
+        const name = `Terminal ${s.terminals.length + 1}`;
+        return { ...s, terminals: [...s.terminals, { id: tid, name }], activeTerminal: tid };
+      }),
+    [],
+  );
+  const closeTerminal = useCallback(
+    (id: string) =>
+      setState((s) => {
+        const idx = s.terminals.findIndex((t) => t.id === id);
+        const terminals = s.terminals.filter((t) => t.id !== id);
+        const activeTerminal =
+          s.activeTerminal === id
+            ? (terminals[idx]?.id ?? terminals[idx - 1]?.id ?? null)
+            : s.activeTerminal;
+        return { ...s, terminals, activeTerminal };
+      }),
+    [],
+  );
+  const renameTerminal = useCallback(
+    (id: string, name: string) =>
+      setState((s) => ({
+        ...s,
+        terminals: s.terminals.map((t) => (t.id === id ? { ...t, name } : t)),
+      })),
+    [],
+  );
+  const setActiveTerminal = useCallback(
+    (id: string) => setState((s) => ({ ...s, activeTerminal: id })),
+    [],
+  );
+
+  const setAgentProvider = useCallback(
+    (p: AgentProvider) => setState((s) => ({ ...s, agentProvider: p })),
+    [],
+  );
+
   // ── Vues éditeur ──
   const getView = useCallback((path: string) => viewRef.current[path], []);
   const setView = useCallback(
@@ -192,6 +276,14 @@ export function IdeStateProvider({
     setSelected,
     getView,
     setView,
+    terminals: state.terminals,
+    activeTerminal: state.activeTerminal,
+    addTerminal,
+    closeTerminal,
+    renameTerminal,
+    setActiveTerminal,
+    agentProvider: state.agentProvider,
+    setAgentProvider,
   };
 
   return <IdeCtx.Provider value={api}>{children}</IdeCtx.Provider>;

@@ -1,7 +1,17 @@
 import type { CreateWorkspaceRequest } from '@sawadev/shared';
-import type { KeyProvider, WorkspaceUiState } from '@sawadev/shared';
+import type { AgentProvider, KeyProvider, WorkspaceUiState } from '@sawadev/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  createAction,
+  deleteAction,
+  getActionRun,
+  listActions,
+  runAction,
+  updateAction,
+} from './actions';
+import { agentChat, agentClear, agentMessages } from './agent';
+import {
+  changePassword,
   deletePasskey,
   getAuthState,
   listPasskeys,
@@ -22,13 +32,42 @@ import {
   readFile,
   writeFile,
 } from './files';
+import {
+  gitBranches,
+  gitCheckout,
+  gitCommit,
+  gitDiff,
+  gitInit,
+  gitLog,
+  gitStage,
+  gitStatus,
+  gitUnstage,
+} from './git';
 import { addPort, listPorts, removePort } from './ports';
-import { deleteKey, getVersion, listKeys, setKey, startUpdate } from './settings';
+import {
+  deleteKey,
+  getDockerOverview,
+  getVersion,
+  listKeys,
+  setKey,
+  startUpdate,
+} from './settings';
+import { killTerminal, listTerminals } from './terminal';
+import {
+  addTool,
+  deleteTool,
+  listCatalog,
+  listTools,
+  startTool,
+  stopTool,
+  toolLogs,
+} from './tools';
 import {
   createWorkspace,
   deleteWorkspace,
   getWorkspaceStats,
   listWorkspaces,
+  renameWorkspace,
   startWorkspace,
   stopWorkspace,
 } from './workspaces';
@@ -72,6 +111,13 @@ export function useRegisterPasskey() {
 export function useLogout() {
   const invalidate = useInvalidateAuth();
   return useMutation({ mutationFn: logout, onSuccess: invalidate });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (body: { currentPassword: string; newPassword: string }) =>
+      changePassword(body.currentPassword, body.newPassword),
+  });
 }
 
 export function usePasskeys() {
@@ -128,6 +174,14 @@ export function useStopWorkspace() {
 export function useDeleteWorkspace() {
   const invalidate = useInvalidateWorkspaces();
   return useMutation({ mutationFn: (id: string) => deleteWorkspace(id), onSuccess: invalidate });
+}
+
+export function useRenameWorkspace() {
+  const invalidate = useInvalidateWorkspaces();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => renameWorkspace(id, name),
+    onSuccess: invalidate,
+  });
 }
 
 /** Stats CPU/mémoire du workspace (sondées périodiquement). */
@@ -235,12 +289,247 @@ export function useRemovePort(workspaceId: string) {
   });
 }
 
+// ── Terminaux (sessions tmux) ────────────────────────────────────────────────
+
+/** Sessions terminal vivantes (pour rouvrir une session orpheline). */
+export function useTerminals(workspaceId: string) {
+  return useQuery({
+    queryKey: ['terminals', workspaceId],
+    queryFn: () => listTerminals(workspaceId),
+    enabled: !!workspaceId,
+    refetchInterval: 8000,
+    retry: false,
+  });
+}
+
+export function useKillTerminal(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (termId: string) => killTerminal(workspaceId, termId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['terminals', workspaceId] }),
+  });
+}
+
+// ── Quick Actions ────────────────────────────────────────────────────────────
+
+const actionsKey = (id: string) => ['actions', id] as const;
+
+export function useActions(workspaceId: string) {
+  return useQuery({
+    queryKey: actionsKey(workspaceId),
+    queryFn: () => listActions(workspaceId),
+    enabled: !!workspaceId,
+  });
+}
+
+export function useCreateAction(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { label: string; command: string }) => createAction(workspaceId, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: actionsKey(workspaceId) }),
+  });
+}
+
+export function useUpdateAction(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; label: string; command: string }) =>
+      updateAction(workspaceId, id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: actionsKey(workspaceId) }),
+  });
+}
+
+export function useDeleteAction(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteAction(workspaceId, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: actionsKey(workspaceId) }),
+  });
+}
+
+export function useRunAction(workspaceId: string) {
+  return useMutation({ mutationFn: (id: string) => runAction(workspaceId, id) });
+}
+
+/** Poll d'un run tant qu'il est actif (l'invalidation de la liste se fait côté composant). */
+export function useActionRun(workspaceId: string, runId: string | null) {
+  return useQuery({
+    queryKey: ['action-run', workspaceId, runId],
+    queryFn: () => getActionRun(workspaceId, runId as string),
+    enabled: !!runId,
+    refetchInterval: (q) => (q.state.data?.status === 'active' ? 800 : false),
+  });
+}
+
+/** Invalide la liste d'actions (rafraîchit le badge « dernier run »). */
+export function useInvalidateActions(workspaceId: string) {
+  const qc = useQueryClient();
+  return () => qc.invalidateQueries({ queryKey: actionsKey(workspaceId) });
+}
+
+// ── Git ──────────────────────────────────────────────────────────────────────
+
+export function useGitStatus(workspaceId: string) {
+  return useQuery({
+    queryKey: ['git-status', workspaceId],
+    queryFn: () => gitStatus(workspaceId),
+    enabled: !!workspaceId,
+    refetchInterval: 5000,
+    retry: false,
+  });
+}
+
+export function useGitBranches(workspaceId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['git-branches', workspaceId],
+    queryFn: () => gitBranches(workspaceId),
+    enabled: enabled && !!workspaceId,
+    retry: false,
+  });
+}
+
+export function useGitLog(workspaceId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['git-log', workspaceId],
+    queryFn: () => gitLog(workspaceId),
+    enabled: enabled && !!workspaceId,
+    retry: false,
+  });
+}
+
+export function useGitDiff(workspaceId: string, path: string | null, staged: boolean) {
+  return useQuery({
+    queryKey: ['git-diff', workspaceId, path, staged],
+    queryFn: () => gitDiff(workspaceId, path as string, staged),
+    enabled: !!path,
+    retry: false,
+  });
+}
+
+/** Mutations git → invalident statut/branches/log. */
+export function useGitActions(workspaceId: string) {
+  const qc = useQueryClient();
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['git-status', workspaceId] });
+    qc.invalidateQueries({ queryKey: ['git-branches', workspaceId] });
+    qc.invalidateQueries({ queryKey: ['git-log', workspaceId] });
+  };
+  return {
+    stage: useMutation({
+      mutationFn: (path?: string) => gitStage(workspaceId, path),
+      onSuccess: refresh,
+    }),
+    unstage: useMutation({
+      mutationFn: (path?: string) => gitUnstage(workspaceId, path),
+      onSuccess: refresh,
+    }),
+    commit: useMutation({
+      mutationFn: (message: string) => gitCommit(workspaceId, message),
+      onSuccess: refresh,
+    }),
+    checkout: useMutation({
+      mutationFn: (branch: string) => gitCheckout(workspaceId, branch),
+      onSuccess: refresh,
+    }),
+    init: useMutation({ mutationFn: () => gitInit(workspaceId), onSuccess: refresh }),
+  };
+}
+
+// ── Services (tools) ─────────────────────────────────────────────────────────
+
+export function useCatalog() {
+  return useQuery({
+    queryKey: ['catalog', 'tools'],
+    queryFn: listCatalog,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+}
+
+export function useTools(workspaceId: string) {
+  return useQuery({
+    queryKey: ['tools', workspaceId],
+    queryFn: () => listTools(workspaceId),
+    enabled: !!workspaceId,
+  });
+}
+
+/** Mutations service (add/start/stop/delete) → invalident la liste. */
+export function useToolActions(workspaceId: string) {
+  const qc = useQueryClient();
+  const refresh = () => qc.invalidateQueries({ queryKey: ['tools', workspaceId] });
+  return {
+    add: useMutation({
+      mutationFn: (type: string) => addTool(workspaceId, type),
+      onSuccess: refresh,
+    }),
+    start: useMutation({
+      mutationFn: (toolId: string) => startTool(workspaceId, toolId),
+      onSuccess: refresh,
+    }),
+    stop: useMutation({
+      mutationFn: (toolId: string) => stopTool(workspaceId, toolId),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({
+      mutationFn: (toolId: string) => deleteTool(workspaceId, toolId),
+      onSuccess: refresh,
+    }),
+  };
+}
+
+export function useToolLogs(workspaceId: string, toolId: string | null) {
+  return useQuery({
+    queryKey: ['tool-logs', workspaceId, toolId],
+    queryFn: () => toolLogs(workspaceId, toolId as string),
+    enabled: !!toolId,
+  });
+}
+
+// ── AI Agent (chat) ──────────────────────────────────────────────────────────
+
+const agentKey = (id: string) => ['agent-messages', id] as const;
+
+export function useAgentMessages(workspaceId: string) {
+  return useQuery({
+    queryKey: agentKey(workspaceId),
+    queryFn: () => agentMessages(workspaceId),
+    enabled: !!workspaceId,
+  });
+}
+
+export function useSendChat(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ provider, prompt }: { provider: AgentProvider; prompt: string }) =>
+      agentChat(workspaceId, provider, prompt),
+    onSuccess: () => qc.invalidateQueries({ queryKey: agentKey(workspaceId) }),
+  });
+}
+
+export function useClearChat(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => agentClear(workspaceId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: agentKey(workspaceId) }),
+  });
+}
+
 // ── Réglages : clés API + système ────────────────────────────────────────────
 
 const KEYS_KEY = ['settings', 'keys'] as const;
 
 export function useVersion() {
   return useQuery({ queryKey: ['system', 'version'], queryFn: getVersion });
+}
+
+/** Aperçu Docker de l'écosystème (lecture seule), rafraîchi en direct. */
+export function useDockerOverview() {
+  return useQuery({
+    queryKey: ['system', 'docker'],
+    queryFn: getDockerOverview,
+    refetchInterval: 5000,
+    retry: false,
+  });
 }
 
 export function useApiKeys() {

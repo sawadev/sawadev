@@ -1,4 +1,4 @@
-import { Settings } from 'lucide-react';
+import { Container, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -47,31 +47,42 @@ export function DeskRail() {
       </button>
       <div style={{ flex: 1 }} />
       <button
+        onClick={() => nav('/docker')}
+        aria-label="Docker"
+        title="Docker"
+        style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}
+      >
+        <div style={RAIL_ICON}>
+          <Container size={17} strokeWidth={1.7} />
+        </div>
+      </button>
+      <button
         onClick={() => nav('/settings')}
         aria-label="Settings"
         title="Settings"
         style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}
       >
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            flexShrink: 0,
-            background: 'var(--elevated)',
-            border: '1px solid var(--border)',
-            color: 'var(--text-2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+        <div style={RAIL_ICON}>
           <Settings size={17} strokeWidth={1.7} />
         </div>
       </button>
     </div>
   );
 }
+
+/** Pastille d'icône du rail (bas). */
+const RAIL_ICON = {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  flexShrink: 0,
+  background: 'var(--elevated)',
+  border: '1px solid var(--border)',
+  color: 'var(--text-2)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+} as const;
 
 /** Page chrome for non-IDE desktop pages: rail + scrollable content area. */
 export function DeskFrame({ children }: { children: ReactNode }) {

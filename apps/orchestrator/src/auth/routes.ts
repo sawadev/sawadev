@@ -1,10 +1,10 @@
-import type { AuthState, PasswordRequest } from '@sawadev/shared';
+import type { AuthState, ChangePasswordRequest, PasswordRequest } from '@sawadev/shared';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import { type Context, Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { getConfig } from '../config';
 import { clientIp, requireSession } from './middleware';
-import { checkPassword, createUser, isSetupDone } from './password';
+import { checkPassword, createUser, isSetupDone, updatePassword } from './password';
 import { bannedFor, clearFailures, recordFailure } from './rate-limit';
 import { SESSION_COOKIE, createSession, revokeSession, validateSession } from './sessions';
 import {
@@ -83,6 +83,22 @@ export function authRoutes(): Hono {
   app.post('/logout', (c) => {
     revokeSession(getCookie(c, SESSION_COOKIE));
     deleteCookie(c, SESSION_COOKIE, { path: '/' });
+    return c.json({ ok: true });
+  });
+
+  // Changement de mot de passe (session requise).
+  app.post('/password', requireSession, async (c) => {
+    const body = (await c.req.json().catch(() => null)) as ChangePasswordRequest | null;
+    if (!body || typeof body.currentPassword !== 'string' || typeof body.newPassword !== 'string') {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+    if (body.newPassword.length < MIN_PASSWORD_LEN) {
+      return c.json({ error: 'weak_password' }, 400);
+    }
+    if (!(await checkPassword(body.currentPassword))) {
+      return c.json({ error: 'invalid_credentials' }, 401);
+    }
+    await updatePassword(body.newPassword);
     return c.json({ ok: true });
   });
 

@@ -37,6 +37,12 @@ export interface AppConfig {
   webDist: string;
   /** Inactivité avant arrêt auto d'un workspace 'idle-stop', en secondes. */
   idleTimeoutSec: number;
+  /** URL de l'orchestrateur **joignable depuis un conteneur workspace** (serveur MCP). */
+  mcpSelfUrl: string;
+  /** Modèle Ollama servi par le conteneur Gemma partagé. */
+  gemmaModel: string;
+  /** URL du conteneur Gemma (Ollama) joignable depuis l'orchestrateur. */
+  gemmaUrl: string;
 }
 
 function envStr(key: string, fallback: string): string {
@@ -56,8 +62,10 @@ let cached: AppConfig | null = null;
 export function getConfig(): AppConfig {
   if (cached) return cached;
   const rpOrigin = envStr('RP_ORIGIN', 'http://localhost:5173');
+  const domain = envStr('DOMAIN', 'localhost');
+  const port = envInt('PORT', 8787);
   cached = {
-    port: envInt('PORT', 8787),
+    port,
     dbPath: envStr('DB_PATH', './data/sawadev.db'),
     rpID: envStr('RP_ID', 'localhost'),
     rpName: envStr('RP_NAME', 'sawadev'),
@@ -69,13 +77,26 @@ export function getConfig(): AppConfig {
     workspaceImage: envStr('WORKSPACE_IMAGE', 'node:20-bookworm-slim'),
     workspacesDir: resolve(envStr('WORKSPACES_DIR', './data/workspaces')),
     dockerNetwork: envStr('DOCKER_NETWORK', 'sawadev_net'),
-    domain: envStr('DOMAIN', 'localhost'),
+    domain,
     caddyAdmin: envStr('CADDY_ADMIN', 'http://localhost:2019'),
     previewScheme: envStr('PREVIEW_SCHEME', rpOrigin.startsWith('https://') ? 'https' : 'http') as
       | 'http'
       | 'https',
     webDist: envStr('WEB_DIST', ''),
     idleTimeoutSec: envInt('IDLE_TIMEOUT_SEC', 60 * 30),
+    // Dev : orchestrateur sur l'hôte → host.docker.internal ; prod : service `orchestrator` du réseau.
+    mcpSelfUrl: envStr(
+      'MCP_SELF_URL',
+      domain === 'localhost'
+        ? `http://host.docker.internal:${port}`
+        : `http://orchestrator:${port}`,
+    ),
+    gemmaModel: envStr('GEMMA_MODEL', 'gemma3:1b'),
+    // Dev : port publié sur l'hôte ; prod : DNS du conteneur sur le réseau sawadev.
+    gemmaUrl: envStr(
+      'GEMMA_URL',
+      domain === 'localhost' ? 'http://localhost:11434' : 'http://sawadev-gemma:11434',
+    ),
   };
   return cached;
 }

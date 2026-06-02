@@ -52,7 +52,8 @@ describe.if(HAVE_DOCKER)('workspaces lifecycle (Docker)', () => {
 
   it('crée un workspace démarré, persistant, puis le supprime', async () => {
     const ws = await createWorkspace({ name: 'Demo Project' });
-    expect(ws.id).toBe('demo-project');
+    expect(ws.id).toMatch(/^[a-z][a-z0-9]{2,4}$/); // id court alphanumérique (3-5 car.)
+    expect(ws.name).toBe('Demo Project'); // le nom d'affichage reste tel quel
     expect(ws.status).toBe('running');
 
     // Le conteneur existe et porte bien le label sawadev.

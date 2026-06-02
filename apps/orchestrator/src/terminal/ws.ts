@@ -2,6 +2,8 @@ import type { KeyProvider } from '@sawadev/shared';
 import type { ServerWebSocket } from 'bun';
 import type { Exec } from 'dockerode';
 import { validateSessionFromCookieHeader } from '../auth/sessions';
+import { getConfig } from '../config';
+import { getOrCreateToken } from '../mcp/tokens';
 import { PROVIDER_ENV, getDecryptedKey } from '../secrets/keys';
 import { getManagedContainer } from '../workspaces/docker';
 import { touchWorkspace } from '../workspaces/service';
@@ -27,6 +29,16 @@ const AGENT_PREFIX = '/ws/agent/';
 /** Nom de session tmux sûr (la barre de statut l'affiche comme nom de workspace). */
 export function sessionName(workspaceId: string): string {
   return workspaceId.replace(/[^a-zA-Z0-9_-]/g, '-') || 'ws';
+}
+
+/**
+ * Nom de session tmux d'un **onglet** terminal : `${ws}-t-<termId>`. Le segment
+ * `-t-` distingue les onglets de la session agent (`${ws}-agent`) et sert de
+ * préfixe pour lister/tuer les sessions d'onglets.
+ */
+export function terminalSessionName(workspaceId: string, termId: string): string {
+  const safe = termId.replace(/[^a-zA-Z0-9_-]/g, '-') || 'main';
+  return `${sessionName(workspaceId)}-t-${safe}`;
 }
 
 /**
@@ -65,6 +77,9 @@ function agentSession(
   // Commande de l'agent configurable ; passée en env pour éviter tout problème de quoting.
   const agentCommand = Bun.env.AGENT_CMD;
   if (agentCommand) env.push(`AGENT_CMD=${agentCommand}`);
+  // Serveur MCP du workspace (mêmes capacités que l'utilisateur).
+  env.push(`SAWA_MCP_URL=${getConfig().mcpSelfUrl}`);
+  env.push(`SAWA_MCP_TOKEN=${getOrCreateToken(workspaceId)}`);
   return { cmd: agentCmd(`${sessionName(workspaceId)}-agent`), env };
 }
 
@@ -99,7 +114,10 @@ export function tryUpgradeWs(
     if (!isProvider(providerParam)) return new Response('unknown_provider', { status: 400 });
     session = agentSession(providerParam, workspaceId);
   } else {
-    session = { cmd: terminalCmd(sessionName(workspaceId)), env: [] };
+    // `?s=<termId>` cible la session d'un onglet précis ; sinon session par défaut (legacy).
+    const termId = url.searchParams.get('s');
+    const name = termId ? terminalSessionName(workspaceId, termId) : sessionName(workspaceId);
+    session = { cmd: terminalCmd(name), env: [] };
   }
 
   const data: TerminalData = { kind: 'terminal', workspaceId, ...session, pendingInput: [] };

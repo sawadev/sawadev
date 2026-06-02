@@ -3,6 +3,7 @@ import { rawFileUrl } from '../api/files';
 import { useFileContent, useSaveFile } from '../api/hooks';
 import { HIcon } from '../icons';
 import { useIde } from '../ide/ide-context';
+import { Markdown } from '../ui/Markdown';
 import { CodeEditor } from './CodeEditor';
 import { ImageViewer } from './ImageViewer';
 import { fileKind } from './file-kind';
@@ -17,14 +18,14 @@ interface Props {
 /** Aiguille selon le type de fichier : éditeur texte, image, aperçu/édition SVG, ou repli binaire. */
 export function WorkspaceFileEditor({ workspaceId, path, onDirtyChange }: Props) {
   const kind = path ? fileKind(path) : 'text';
-  const needsText = kind === 'text' || kind === 'svg';
+  const needsText = kind === 'text' || kind === 'svg' || kind === 'markdown';
 
   const ide = useIde();
   const { data, isLoading, isError } = useFileContent(workspaceId, needsText ? path : null);
   const save = useSaveFile(workspaceId);
   const [draft, setDraft] = useState('');
   const [loadedPath, setLoadedPath] = useState<string | null>(null);
-  const [svgMode, setSvgMode] = useState<'preview' | 'edit'>('preview');
+  const [viewMode, setViewMode] = useState<'preview' | 'edit'>('preview');
 
   // Réinitialise le brouillon à chaque nouveau contenu chargé.
   useEffect(() => {
@@ -34,10 +35,10 @@ export function WorkspaceFileEditor({ workspaceId, path, onDirtyChange }: Props)
     }
   }, [data, path]);
 
-  // Un SVG s'ouvre toujours en aperçu : on remet le mode à chaque changement de fichier.
+  // SVG et Markdown s'ouvrent en aperçu : on remet le mode à chaque changement de fichier.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset volontaire sur `path`
   useEffect(() => {
-    setSvgMode('preview');
+    setViewMode('preview');
   }, [path]);
 
   const ready = !needsText || (!isLoading && loadedPath === path && !isError);
@@ -84,20 +85,36 @@ export function WorkspaceFileEditor({ workspaceId, path, onDirtyChange }: Props)
   }
 
   // SVG en aperçu : rendu image + bascule vers l'édition.
-  if (kind === 'svg' && svgMode === 'preview') {
+  if (kind === 'svg' && viewMode === 'preview') {
     return (
       <div style={{ position: 'relative', height: '100%', minHeight: 0 }}>
         <ImageViewer workspaceId={workspaceId} path={path} />
         <div style={{ position: 'absolute', top: 10, right: 14, zIndex: 4 }}>
-          <ViewToggle icon="file" label="Edit" onClick={() => setSvgMode('edit')} />
+          <ViewToggle icon="file" label="Edit" onClick={() => setViewMode('edit')} />
         </div>
       </div>
     );
   }
 
-  // Texte (et SVG en édition) : chargement / erreur / éditeur.
+  // Texte (et SVG/Markdown en édition) : chargement / erreur / éditeur.
   if (isLoading || loadedPath !== path) return <Centered>Loading {path}…</Centered>;
   if (isError) return <Centered>Could not open {path}.</Centered>;
+
+  // Markdown en aperçu : rendu document + bascule vers l'édition.
+  if (kind === 'markdown' && viewMode === 'preview') {
+    return (
+      <div style={{ position: 'relative', height: '100%', minHeight: 0 }}>
+        <div style={{ height: '100%', overflow: 'auto', padding: '20px 24px' }}>
+          <div className="md-doc">
+            <Markdown text={draft} />
+          </div>
+        </div>
+        <div style={{ position: 'absolute', top: 10, right: 14, zIndex: 4 }}>
+          <ViewToggle icon="file" label="Edit" onClick={() => setViewMode('edit')} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: 'relative', height: '100%', minHeight: 0 }}>
@@ -110,8 +127,8 @@ export function WorkspaceFileEditor({ workspaceId, path, onDirtyChange }: Props)
         onViewState={ide.setView}
       />
       <div style={{ position: 'absolute', top: 10, right: 14, zIndex: 4, display: 'flex', gap: 8 }}>
-        {kind === 'svg' && (
-          <ViewToggle icon="eye" label="Preview" onClick={() => setSvgMode('preview')} />
+        {(kind === 'svg' || kind === 'markdown') && (
+          <ViewToggle icon="eye" label="Preview" onClick={() => setViewMode('preview')} />
         )}
         {dirty && (
           <button

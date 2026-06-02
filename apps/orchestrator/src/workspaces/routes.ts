@@ -8,6 +8,7 @@ import {
   getWorkspaceStats,
   listWorkspaces,
   rebuildWorkspace,
+  renameWorkspace,
   startWorkspace,
   stopWorkspace,
 } from './service';
@@ -32,6 +33,14 @@ export function workspaceRoutes(): Hono {
 
   app.get('/:id', async (c) => {
     const ws = await getWorkspace(c.req.param('id'));
+    return ws ? c.json(ws) : c.json({ error: 'not_found' }, 404);
+  });
+
+  app.patch('/:id', async (c) => {
+    const body = (await c.req.json().catch(() => null)) as { name?: string } | null;
+    const name = body?.name?.trim();
+    if (!name) return c.json({ error: 'invalid_name' }, 400);
+    const ws = await renameWorkspace(c.req.param('id'), name);
     return ws ? c.json(ws) : c.json({ error: 'not_found' }, 404);
   });
 

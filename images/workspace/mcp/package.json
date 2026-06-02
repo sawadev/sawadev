@@ -1,0 +1,11 @@
+{
+  "name": "sawadev-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Proxy MCP stdio : expose les capacités managées du workspace (Quick Actions, Services, Ports, Git) aux agents CLI via l'API de l'orchestrateur.",
+  "bin": { "sawadev-mcp": "./index.mjs" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  }
+}

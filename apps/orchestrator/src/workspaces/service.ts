@@ -29,22 +29,25 @@ interface WorkspaceRow {
   last_opened_at: number | null;
 }
 
-/** Convertit un nom libre en slug stable et unique. */
-function slugify(name: string): string {
-  const base =
-    name
-      .toLowerCase()
-      .normalize('NFKD')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 40) || 'workspace';
+const ID_LETTERS = 'abcdefghijklmnopqrstuvwxyz';
+const ID_ALNUM = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+/**
+ * Génère un id de workspace court et unique : 5 caractères alphanumériques
+ * (1ʳᵉ lettre), sûr pour les noms de conteneur, réseaux et sous-domaines DNS.
+ */
+function generateWorkspaceId(): string {
   const db = getDb();
-  let id = base;
-  let n = 2;
-  while (db.query('SELECT 1 FROM workspaces WHERE id = ?').get(id)) {
-    id = `${base}-${n++}`;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const bytes = crypto.getRandomValues(new Uint8Array(5));
+    let id = '';
+    for (let i = 0; i < bytes.length; i++) {
+      const set = i === 0 ? ID_LETTERS : ID_ALNUM;
+      id += set.charAt((bytes[i] ?? 0) % set.length);
+    }
+    if (!db.query('SELECT 1 FROM workspaces WHERE id = ?').get(id)) return id;
   }
-  return id;
+  throw new Error('id_generation_failed');
 }
 
 function rowToWorkspace(row: WorkspaceRow, status: WorkspaceStatus): Workspace {
@@ -78,7 +81,7 @@ async function statusOf(id: string): Promise<WorkspaceStatus> {
 }
 
 /** Tire l'image si absente localement. */
-async function ensureImage(image: string): Promise<void> {
+export async function ensureImage(image: string): Promise<void> {
   const docker = getDocker();
   try {
     await docker.getImage(image).inspect();
@@ -111,7 +114,7 @@ export async function createWorkspace(req: CreateWorkspaceRequest): Promise<Work
   const { workspaceImage, workspacesDir, dockerNetwork } = getConfig();
   const image = req.image?.trim() || workspaceImage;
   const lifecycle = req.lifecycle === 'idle-stop' ? 'idle-stop' : 'always-on';
-  const id = slugify(req.name);
+  const id = generateWorkspaceId();
   const hostDir = join(workspacesDir, id);
   mkdirSync(hostDir, { recursive: true });
 
@@ -129,6 +132,8 @@ export async function createWorkspace(req: CreateWorkspaceRequest): Promise<Work
       Binds: [`${hostDir}:/workspace`],
       NetworkMode: dockerNetwork,
       RestartPolicy: { Name: 'unless-stopped' },
+      // Permet au conteneur de joindre l'orchestrateur sur l'hôte (dev / serveur MCP).
+      ExtraHosts: ['host.docker.internal:host-gateway'],
     },
   });
   await container.start();
@@ -225,6 +230,14 @@ export async function stopWorkspace(id: string): Promise<Workspace | null> {
   const container = await getManagedContainer(id);
   if (container) await container.stop().catch(() => undefined);
   return rowToWorkspace(row, await statusOf(id));
+}
+
+/** Renomme un workspace (nom d'affichage seulement ; l'id et les conteneurs sont inchangés). */
+export async function renameWorkspace(id: string, name: string): Promise<Workspace | null> {
+  const row = getRow(id);
+  if (!row) return null;
+  getDb().run('UPDATE workspaces SET name = ? WHERE id = ?', [name, id]);
+  return rowToWorkspace({ ...row, name }, await statusOf(id));
 }
 
 /** Lit l'image déclarée dans un .devcontainer/devcontainer.json (JSONC toléré). */

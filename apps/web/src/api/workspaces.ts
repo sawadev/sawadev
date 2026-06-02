@@ -1,5 +1,5 @@
 import type { CreateWorkspaceRequest, Workspace, WorkspaceStats } from '@sawadev/shared';
-import { apiGet, apiPost } from './client';
+import { apiGet, apiPatch, apiPost } from './client';
 
 export function getWorkspaceStats(id: string): Promise<WorkspaceStats> {
   return apiGet<WorkspaceStats>(`/api/workspaces/${id}/stats`);
@@ -15,6 +15,10 @@ export function getWorkspace(id: string): Promise<Workspace> {
 
 export function createWorkspace(req: CreateWorkspaceRequest): Promise<Workspace> {
   return apiPost<Workspace>('/api/workspaces', req);
+}
+
+export function renameWorkspace(id: string, name: string): Promise<Workspace> {
+  return apiPatch<Workspace>(`/api/workspaces/${id}`, { name });
 }
 
 export function startWorkspace(id: string): Promise<Workspace> {

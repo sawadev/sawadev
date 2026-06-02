@@ -101,6 +101,18 @@ export async function writeWorkspaceFile(
   await writeFile(abs, content, 'utf8');
 }
 
+/** Écrit des octets bruts (upload de fichier, quel que soit le type). Crée les dossiers parents. */
+export async function writeWorkspaceFileBytes(
+  id: string,
+  relPath: string,
+  bytes: Uint8Array,
+): Promise<void> {
+  const root = workspaceRoot(id);
+  const abs = safeResolve(root, relPath);
+  await mkdir(dirname(abs), { recursive: true });
+  await writeFile(abs, bytes);
+}
+
 export async function moveWorkspacePath(id: string, from: string, to: string): Promise<void> {
   const root = workspaceRoot(id);
   const absFrom = safeResolve(root, from);

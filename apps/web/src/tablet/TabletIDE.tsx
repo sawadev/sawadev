@@ -10,7 +10,7 @@ import { IdeStateProvider } from '../ide/IdeState';
 import { RightDock } from '../ide/RightDock';
 import { StatsChip } from '../ide/StatsChip';
 import { useIde } from '../ide/ide-context';
-import { WorkspaceTerminal } from '../terminal/Terminal';
+import { TerminalPanel } from '../terminal/TerminalPanel';
 import { StatusDot } from '../ui';
 
 const PANES: { k: string; icon: string; label: string }[] = [
@@ -70,7 +70,7 @@ function TabletIDEBody({ workspaceId }: { workspaceId: string }) {
         </div>
       </div>
     ),
-    terminal: <WorkspaceTerminal workspaceId={workspaceId} />,
+    terminal: <TerminalPanel workspaceId={workspaceId} />,
   }[tab];
 
   return (
