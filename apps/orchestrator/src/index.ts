@@ -2,7 +2,7 @@ import type { ServerWebSocket } from 'bun';
 import { createApp } from './app';
 import { type FileWatchData, fileWatchSocket, tryUpgradeFilesWs } from './files/watch-ws';
 import { type TerminalData, terminalWebSocket, tryUpgradeWs } from './terminal/ws';
-import { startIdleSweeper } from './workspaces/service';
+import { reconcileWorkspaceBinds, startIdleSweeper } from './workspaces/service';
 
 /** Toutes les connexions WebSocket gérées (terminal/agent + surveillance fichiers). */
 type WsData = TerminalData | FileWatchData;
@@ -30,6 +30,9 @@ const app = createApp();
 
 // Arrêt auto des workspaces 'idle-stop' inactifs.
 startIdleSweeper();
+
+// Répare les binds /workspace mal configurés (DooD) — auto-soin au démarrage.
+reconcileWorkspaceBinds().catch(() => undefined);
 
 const server = Bun.serve<WsData>({
   port: PORT,

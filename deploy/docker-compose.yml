@@ -54,6 +54,9 @@ services:
       DOCKER_NETWORK: sawadev_net
       WORKSPACE_IMAGE: ${REGISTRY:-ghcr.io/sawadev}/workspace:${TAG:-latest}
       WORKSPACES_DIR: /data/workspaces
+      # Chemin HÔTE des workspaces : source des binds /workspace (DooD ; résolu par le démon
+      # sur l'hôte). Doit matcher le côté hôte du mount `${DATA_DIR}:/data` ci-dessous.
+      HOST_WORKSPACES_DIR: ${DATA_DIR:-/opt/sawadev/data}/workspaces
       SAWADEV_SECRET: ${SAWADEV_SECRET}
       COMPOSE_DIR: /opt/sawadev
       CHANNEL: ${CHANNEL:-stable}

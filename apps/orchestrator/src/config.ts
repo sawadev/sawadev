@@ -23,8 +23,14 @@ export interface AppConfig {
   banDurationSec: number;
   /** Image Docker par défaut des workspaces. */
   workspaceImage: string;
-  /** Dossier hôte (absolu) contenant les volumes bind des workspaces. */
+  /** Dossier des workspaces vu par l'orchestrateur (mkdir / lecture / suppression). */
   workspacesDir: string;
+  /**
+   * Chemin **hôte** du dossier workspaces, utilisé comme **source des binds** (le démon
+   * Docker résout les binds sur l'hôte en DooD). Vide → on retombe sur `workspacesDir`
+   * (dev : orchestrateur sur l'hôte, pas de DooD).
+   */
+  hostWorkspacesDir: string;
   /** Réseau Docker auquel rattacher les workspaces. */
   dockerNetwork: string;
   /** Domaine de base pour les sous-domaines de preview (ex. example.com). */
@@ -64,6 +70,7 @@ export function getConfig(): AppConfig {
   const rpOrigin = envStr('RP_ORIGIN', 'http://localhost:5173');
   const domain = envStr('DOMAIN', 'localhost');
   const port = envInt('PORT', 8787);
+  const workspacesDir = resolve(envStr('WORKSPACES_DIR', './data/workspaces'));
   cached = {
     port,
     dbPath: envStr('DB_PATH', './data/sawadev.db'),
@@ -75,7 +82,9 @@ export function getConfig(): AppConfig {
     maxLoginFails: envInt('MAX_LOGIN_FAILS', 5),
     banDurationSec: envInt('BAN_DURATION_SEC', 60 * 15),
     workspaceImage: envStr('WORKSPACE_IMAGE', 'node:20-bookworm-slim'),
-    workspacesDir: resolve(envStr('WORKSPACES_DIR', './data/workspaces')),
+    workspacesDir,
+    // Chemin hôte (non résolu : c'est un chemin de l'hôte, pas du cwd de l'orchestrateur).
+    hostWorkspacesDir: envStr('HOST_WORKSPACES_DIR', '') || workspacesDir,
     dockerNetwork: envStr('DOCKER_NETWORK', 'sawadev_net'),
     domain,
     caddyAdmin: envStr('CADDY_ADMIN', 'http://localhost:2019'),

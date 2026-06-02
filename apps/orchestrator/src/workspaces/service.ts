@@ -50,6 +50,36 @@ function generateWorkspaceId(): string {
   throw new Error('id_generation_failed');
 }
 
+/** Dossier du workspace vu par l'orchestrateur (mkdir / lecture / rm / colonne `volume`). */
+function localDir(id: string): string {
+  return join(getConfig().workspacesDir, id);
+}
+
+/** Source du bind `/workspace` : chemin **hôte** (résolu par le démon en DooD). */
+function bindSource(id: string): string {
+  return join(getConfig().hostWorkspacesDir, id);
+}
+
+/** Crée (et démarre pas) le conteneur d'un workspace avec le bon bind hôte. */
+async function createWsContainer(id: string, image: string) {
+  const { dockerNetwork } = getConfig();
+  return getDocker().createContainer({
+    Image: image,
+    name: containerName(id),
+    Labels: { [MANAGED_LABEL]: 'true', [WORKSPACE_LABEL]: id },
+    Cmd: ['tail', '-f', '/dev/null'],
+    WorkingDir: '/workspace',
+    Tty: true,
+    HostConfig: {
+      Binds: [`${bindSource(id)}:/workspace`],
+      NetworkMode: dockerNetwork,
+      RestartPolicy: { Name: 'unless-stopped' },
+      // Permet au conteneur de joindre l'orchestrateur sur l'hôte (dev / serveur MCP).
+      ExtraHosts: ['host.docker.internal:host-gateway'],
+    },
+  });
+}
+
 function rowToWorkspace(row: WorkspaceRow, status: WorkspaceStatus): Workspace {
   return {
     id: row.id,
@@ -111,38 +141,23 @@ export async function getWorkspace(id: string): Promise<Workspace | null> {
 }
 
 export async function createWorkspace(req: CreateWorkspaceRequest): Promise<Workspace> {
-  const { workspaceImage, workspacesDir, dockerNetwork } = getConfig();
+  const { workspaceImage } = getConfig();
   const image = req.image?.trim() || workspaceImage;
   const lifecycle = req.lifecycle === 'idle-stop' ? 'idle-stop' : 'always-on';
   const id = generateWorkspaceId();
-  const hostDir = join(workspacesDir, id);
-  mkdirSync(hostDir, { recursive: true });
+  mkdirSync(localDir(id), { recursive: true });
 
   await ensureNetwork();
   await ensureImage(image);
 
-  const container = await getDocker().createContainer({
-    Image: image,
-    name: containerName(id),
-    Labels: { [MANAGED_LABEL]: 'true', [WORKSPACE_LABEL]: id },
-    Cmd: ['tail', '-f', '/dev/null'],
-    WorkingDir: '/workspace',
-    Tty: true,
-    HostConfig: {
-      Binds: [`${hostDir}:/workspace`],
-      NetworkMode: dockerNetwork,
-      RestartPolicy: { Name: 'unless-stopped' },
-      // Permet au conteneur de joindre l'orchestrateur sur l'hôte (dev / serveur MCP).
-      ExtraHosts: ['host.docker.internal:host-gateway'],
-    },
-  });
+  const container = await createWsContainer(id, image);
   await container.start();
 
   const now = Date.now();
   getDb().run(
     `INSERT INTO workspaces (id, name, image, container_id, volume, lifecycle, created_at, last_opened_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, req.name, image, container.id, hostDir, lifecycle, now, now],
+    [id, req.name, image, container.id, localDir(id), lifecycle, now, now],
   );
   return rowToWorkspace(getRow(id) as WorkspaceRow, 'running');
 }
@@ -269,23 +284,10 @@ export async function rebuildWorkspace(id: string): Promise<Workspace | null> {
   const image = readDevcontainerImage(row.volume);
   if (!image) throw new Error('no_devcontainer_image');
 
-  const { dockerNetwork } = getConfig();
   const old = await getManagedContainer(id);
   if (old) await old.remove({ force: true }).catch(() => undefined);
   await ensureImage(image);
-  const container = await getDocker().createContainer({
-    Image: image,
-    name: containerName(id),
-    Labels: { [MANAGED_LABEL]: 'true', [WORKSPACE_LABEL]: id },
-    Cmd: ['tail', '-f', '/dev/null'],
-    WorkingDir: '/workspace',
-    Tty: true,
-    HostConfig: {
-      Binds: [`${row.volume}:/workspace`],
-      NetworkMode: dockerNetwork,
-      RestartPolicy: { Name: 'unless-stopped' },
-    },
-  });
+  const container = await createWsContainer(id, image);
   await container.start();
   getDb().run('UPDATE workspaces SET image = ?, container_id = ? WHERE id = ?', [
     image,
@@ -310,4 +312,32 @@ export async function deleteWorkspace(id: string): Promise<boolean> {
   // Supprime le volume bind (la suppression d'un workspace est explicite).
   rmSync(row.volume, { recursive: true, force: true });
   return true;
+}
+
+/**
+ * Répare au démarrage les workspaces dont le bind `/workspace` ne pointe pas vers le bon
+ * chemin hôte (déploiement DooD antérieur / changement de `HOST_WORKSPACES_DIR`) : recrée
+ * le conteneur avec le bon bind. Les fichiers de l'explorateur (déjà au bon chemin) deviennent
+ * visibles dans le terminal — explorateur et terminal convergent. Idempotent et tolérant.
+ */
+export async function reconcileWorkspaceBinds(): Promise<void> {
+  const rows = getDb().query<WorkspaceRow, []>('SELECT * FROM workspaces').all();
+  for (const row of rows) {
+    try {
+      const container = await getManagedContainer(row.id);
+      if (!container) continue;
+      const info = await container.inspect();
+      const mount = (info.Mounts ?? []).find((m) => m.Destination === '/workspace');
+      const expected = bindSource(row.id);
+      if (mount?.Source === expected) continue; // déjà correct
+      const running = info.State?.Running ?? false;
+      await container.remove({ force: true }).catch(() => undefined);
+      const fresh = await createWsContainer(row.id, row.image);
+      if (running) await fresh.start();
+      getDb().run('UPDATE workspaces SET container_id = ? WHERE id = ?', [fresh.id, row.id]);
+      console.log(`reconciled workspace ${row.id}: /workspace bind → ${expected}`);
+    } catch (err) {
+      console.error(`reconcile workspace ${row.id} failed:`, (err as Error).message);
+    }
+  }
 }
