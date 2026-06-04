@@ -33,13 +33,14 @@ describe('appels Admin API (fetch mocké)', () => {
     globalThis.fetch = realFetch;
   });
 
-  it('putPreviewRoute crée le serveur puis poste la route', async () => {
+  it('putPreviewRoute crée le serveur puis insère la route en tête', async () => {
     await putPreviewRoute(buildPreviewRoute('x-80', 'x-80.localhost', 'sawadev-ws-x:80'));
     const methods = calls.map((c) => `${c.method} ${new URL(c.url).pathname}`);
     expect(methods).toContain('PATCH /config/apps/http/servers');
-    expect(methods).toContain('POST /config/apps/http/servers/srv0/routes');
-    const post = calls.find((c) => c.url.endsWith('/routes'));
-    expect(post?.body).toContain('"@id":"x-80"');
+    // Insertion en tête (index 0) pour passer devant le catch-all `*.{domaine}`.
+    expect(methods).toContain('PUT /config/apps/http/servers/srv0/routes/0');
+    const put = calls.find((c) => c.url.endsWith('/routes/0'));
+    expect(put?.body).toContain('"@id":"x-80"');
   });
 
   it('deletePreviewRoute supprime par @id', async () => {

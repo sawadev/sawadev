@@ -2,6 +2,7 @@ import type { ServerWebSocket } from 'bun';
 import { createApp } from './app';
 import { type FileWatchData, fileWatchSocket, tryUpgradeFilesWs } from './files/watch-ws';
 import { type TerminalData, terminalWebSocket, tryUpgradeWs } from './terminal/ws';
+import { reconcilePreviewRoutes } from './workspaces/ports';
 import { reconcileWorkspaceBinds, startIdleSweeper } from './workspaces/service';
 
 /** Toutes les connexions WebSocket gérées (terminal/agent + surveillance fichiers). */
@@ -33,6 +34,9 @@ startIdleSweeper();
 
 // Répare les binds /workspace mal configurés (DooD) — auto-soin au démarrage.
 reconcileWorkspaceBinds().catch(() => undefined);
+
+// Rejoue les routes de preview vers Caddy (perdues si Caddy a redémarré).
+reconcilePreviewRoutes().catch(() => undefined);
 
 const server = Bun.serve<WsData>({
   port: PORT,

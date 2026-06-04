@@ -61,6 +61,29 @@ export async function addPort(workspaceId: string, port: number): Promise<Port> 
   return toPort(row as PortRow);
 }
 
+/**
+ * Rejoue toutes les routes de preview connues vers Caddy au démarrage.
+ * Les routes dynamiques vivent dans la config runtime de Caddy : un redémarrage du
+ * conteneur (recharge le Caddyfile) les efface alors que la table `ports` les liste
+ * toujours. Auto-soin idempotent et tolérant (un échec sur une route n'arrête pas les autres).
+ */
+export async function reconcilePreviewRoutes(): Promise<void> {
+  const { domain } = getConfig();
+  const rows = getDb().query<PortRow, []>('SELECT * FROM ports').all();
+  for (const row of rows) {
+    try {
+      const route = buildPreviewRoute(
+        row.subdomain,
+        `${row.subdomain}.${domain}`,
+        `${containerName(row.workspace_id)}:${row.port}`,
+      );
+      await putPreviewRoute(route);
+    } catch (err) {
+      console.error(`reconcile preview route ${row.subdomain} failed:`, (err as Error).message);
+    }
+  }
+}
+
 /** Retire un port : supprime la route Caddy + l'enregistrement. */
 export async function removePort(workspaceId: string, port: number): Promise<boolean> {
   const row = getDb()

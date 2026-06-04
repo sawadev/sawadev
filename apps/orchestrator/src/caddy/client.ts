@@ -48,8 +48,12 @@ export async function putPreviewRoute(route: CaddyRoute): Promise<void> {
   await ensureServer();
   // Idempotent : retire une éventuelle route existante de même @id.
   await admin(`/id/${route['@id']}`, { method: 'DELETE' }).catch(() => undefined);
-  const res = await admin(`/config/apps/http/servers/${SERVER}/routes`, {
-    method: 'POST',
+  // Insertion EN TÊTE (index 0) : le Caddyfile place un catch-all `*.{domaine}`
+  // terminal (respond 404) avant nos routes. Un POST (append) tomberait derrière
+  // ce catch-all qui matche aussi `<sous-domaine>.{domaine}` → 404. On passe donc
+  // devant lui via PUT à l'index 0.
+  const res = await admin(`/config/apps/http/servers/${SERVER}/routes/0`, {
+    method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(route),
   });
