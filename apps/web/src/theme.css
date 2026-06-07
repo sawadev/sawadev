@@ -893,6 +893,9 @@ body {
 .chat-input:focus-within {
   border-color: var(--accent-line);
 }
+.mic-live {
+  animation: pulse 1.4s var(--ease) infinite;
+}
 .chat-input textarea {
   flex: 1;
   border: none;

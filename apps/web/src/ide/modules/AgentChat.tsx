@@ -7,6 +7,7 @@ import { AIMark, Typing } from '../../ui';
 import { Markdown, looksLikeMarkdown } from '../../ui/Markdown';
 import { Menu } from '../../ui/Menu';
 import { ProviderLogo } from '../../ui/ProviderLogo';
+import { useSpeechToText } from '../../ui/useSpeechToText';
 import { useIde } from '../ide-context';
 
 /** Provider effectif : celui mémorisé s'il est disponible, sinon Gemma (défaut, sans clé). */
@@ -116,6 +117,30 @@ export function AgentChat({
   const [slowHint, setSlowHint] = useState(false);
   const hasKey = connected.length > 0; // toujours vrai (≥ Gemma) → chat jamais désactivé
   const scroller = useRef<HTMLDivElement>(null);
+  const textarea = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grandit le textarea jusqu'à 5 lignes, puis scrollable.
+  useEffect(() => {
+    const ta = textarea.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    const cs = getComputedStyle(ta);
+    const lh = Number.parseFloat(cs.lineHeight) || Number.parseFloat(cs.fontSize) * 1.5;
+    const max = lh * 5 + Number.parseFloat(cs.paddingTop) + Number.parseFloat(cs.paddingBottom);
+    ta.style.height = `${Math.min(ta.scrollHeight, max)}px`;
+    ta.style.overflowY = ta.scrollHeight > max ? 'auto' : 'hidden';
+  }, [input]);
+
+  // Dictée vocale (Web Speech API) : le transcript s'ajoute au texte déjà saisi.
+  const dictateBase = useRef('');
+  const stt = useSpeechToText((transcript) => {
+    const base = dictateBase.current;
+    setInput(base && transcript ? `${base} ${transcript}` : base || transcript);
+  });
+  const toggleMic = () => {
+    if (!stt.listening) dictateBase.current = input.trim();
+    stt.toggle();
+  };
 
   // Scroll en bas à chaque nouveau message / état d'envoi.
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll au changement de longueur
@@ -230,6 +255,7 @@ export function AgentChat({
         )}
         <div className="chat-input">
           <textarea
+            ref={textarea}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -242,6 +268,22 @@ export function AgentChat({
             disabled={!hasKey}
             rows={1}
           />
+          {stt.supported && (
+            <button
+              type="button"
+              className={`btn btn-ghost btn-icon btn-sm${stt.listening ? ' mic-live' : ''}`}
+              aria-label={stt.listening ? 'Stop dictation' : 'Voice input'}
+              title={stt.listening ? 'Stop dictation' : 'Voice input'}
+              disabled={!hasKey}
+              onClick={toggleMic}
+            >
+              <HIcon
+                name="mic"
+                size={15}
+                color={stt.listening ? 'var(--danger)' : 'var(--muted)'}
+              />
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-primary btn-icon btn-sm"
